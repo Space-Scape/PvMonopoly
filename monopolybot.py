@@ -959,5 +959,6 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 
-bot.run(os.getenv('DISCORD_BOT_TOKEN'))
+bot.run(os.getenv('bot_token'))
+
 
