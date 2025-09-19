@@ -43,7 +43,7 @@ credentials_dict = {
     "type": os.getenv("type"),
     "project_id": os.getenv("project_id"),
     "private_key_id": os.getenv("private_key_id"),
-    "private_key": os.getenv("private_key"),
+    "private_key": os.getenv("private_key").replace("\\n", "\n"),
     "client_email": os.getenv("client_email"),
     "client_id": os.getenv("client_id"),
     "auth_uri": os.getenv("auth_uri"),
@@ -960,3 +960,4 @@ async def on_ready():
 
 
 bot.run(os.getenv('DISCORD_BOT_TOKEN'))
+
