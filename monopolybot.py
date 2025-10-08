@@ -647,7 +647,12 @@ async def gp(interaction: discord.Interaction):
     submitted_for="User you are submitting the drop for (optional)",
 )
 async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attachment, submitted_for: Optional[discord.Member] = None):
-    await interaction.response.defer(ephemeral=True) # Defer the response
+    try:
+        await interaction.response.defer(ephemeral=True)
+    except discord.NotFound:
+        print("❌ Interaction not found or timed out before defer.")
+        return
+
     if interaction.channel_id != COMMAND_CHANNEL_ID:
         await interaction.followup.send(
             "❌ You can only use this command in the designated command channel.", ephemeral=True
@@ -812,4 +817,5 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
