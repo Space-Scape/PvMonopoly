@@ -395,68 +395,6 @@ class DropReviewButtons(ui.View):
             return
         await interaction.response.send_modal(RejectModal(self.message, self.submitted_user))
 
-
-                if drop_gp_value > 0 and team_name != "*No team*":
-                    team_data_records = team_data_sheet.get_all_records()
-                    for idx, record in enumerate(team_data_records, start=2):
-                        if record.get("Team") == team_name:
-                            current_gp = int(record.get("GP", 0) or 0)
-                            new_gp = current_gp + drop_gp_value
-                            team_data_sheet.update_cell(idx, 8, new_gp) # GP is in Column H (8)
-                            print(f"✅ Awarded {drop_gp_value} GP to {team_name}. New total: {new_gp}")
-                            if log_chan:
-                                await log_chan.send(f"💰 **{team_name}** earned **{drop_gp_value:,} GP** from a **{self.drop}** drop!")
-                            break
-            except Exception as e:
-                print(f"❌ Error during GP calculation: {e}")
-            # ==========================================================
-            # 🔹 END: GP CALCULATION LOGIC
-            # ==========================================================
-
-            if team_name and team_name != "*No team*":
-                try:
-                    records = team_data_sheet.get_all_records()
-                    current_tile = None
-                    for record in records:
-                        if record.get("Team") == team_name:
-                            current_tile = int(record.get("Position", 0))
-                            break
-                    
-                    tile_boss_map = {
-                        1: ["Zulrah"], 3: ["General Graardor", "K'ril Tsutsaroth", "Kree'arra", "Commander Zilyana"],
-                        4: ["Vet'ion", "Venenatis", "Callisto"], 5: ["The Whisperer"], 6: ["Tombs of Amascut"],
-                        8: ["Theatre of Blood"], 9: ["Chambers of Xeric"], 10: ["Gauntlet", "Nex"], 11: ["Barrows"],
-                        13: ["Moons of Peril"], 14: ["Nightmare"], 15: ["The Leviathan"], 16: ["Yama"],
-                        18: ["Scorpia", "Chaos Fanatic", "Crazy Archaeologist"], 19: ["Cerberus"],
-                        21: ["Tombs of Amascut"], 23: ["Theatre of Blood"], 24: ["Chambers of Xeric"],
-                        25: ["Vardorvis"], 26: ["Hueycoatl"], 27: ["Colosseum"], 29: ["Doom of Mokhaiotl"],
-                        31: ["Tombs of Amascut"], 32: ["Theatre of Blood"], 34: ["Chambers of Xeric"],
-                        35: ["Duke Sucellus"], 37: ["Phantom Muspah"], 39: ["Araxxor"]
-                    }
-
-                    bosses_for_tile = tile_boss_map.get(current_tile, [])
-                    if self.boss in bosses_for_tile:
-                        increment_rolls_available(team_name)
-                        print(f"✅ Roll granted: Team {team_name} on tile {current_tile} ({self.boss})")
-                    else:
-                        print(f"ℹ️ No roll granted: Team {team_name} on tile {current_tile}, drop boss {self.boss} not valid here.")
-                except Exception as e:
-                    print(f"❌ Error checking tile before granting roll: {e}")
-
-            await interaction.response.send_message("✅ Drop approved and logged.", ephemeral=True)
-
-        except Exception as e:
-            print(f"❌ Error in approve_button: {e}")
-            await interaction.response.send_message(f"Error approving drop: {e}", ephemeral=True)
-
-    @ui.button(label="Reject Drop", style=discord.ButtonStyle.danger, custom_id="reject_drop")
-    async def reject_button(self, interaction: discord.Interaction, button: ui.Button):
-        if not self.current_reviewer:
-            await interaction.response.send_message("You must start reviewing before rejecting.", ephemeral=True)
-            return
-        await interaction.response.send_modal(RejectModal(self.message, self.submitted_user))
-# ... rest of your script
-
 # ======= BossSelect Modal + View =======
 class BossSelectView(ui.View):
     def __init__(self, submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str):
@@ -874,4 +812,3 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
