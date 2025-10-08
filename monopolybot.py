@@ -728,7 +728,7 @@ def get_held_cards(sheet_obj, team_name: str):
 
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
     team_name = get_team(interaction.user)
     if not team_name:
         await interaction.followup.send("❌ You don't have a team role assigned.", ephemeral=True)
@@ -817,5 +817,6 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
 
