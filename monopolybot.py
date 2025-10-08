@@ -332,7 +332,6 @@ class DropReviewButtons(ui.View):
             # ==========================================================
             try:
                 item_values_records = item_values_sheet.get_all_records()
-                # THE ONLY CHANGE IS ON THE LINE BELOW
                 gp_lookup = {item['Item']: int(str(item['GP']).replace(',', '')) for item in item_values_records}
                 drop_gp_value = gp_lookup.get(self.drop, 0)
 
@@ -396,65 +395,15 @@ class DropReviewButtons(ui.View):
             return
         await interaction.response.send_modal(RejectModal(self.message, self.submitted_user))
 
-# ======= Commands =======
-@bot.tree.command(name="roll", description="Roll a dice (1-6)")
-async def roll(interaction: discord.Interaction):
-    team_name = get_team(interaction.user) or "*No team*"
-    if team_name == "*No team*":
-        await interaction.response.send_message("❌ You are not on a team.", ephemeral=True)
-        return
 
-    records = team_data_sheet.get_all_records()
-    rolls_available = 0
-    for record in records:
-        if record.get("Team") == team_name:
-            rolls_available = int(record.get("Rolls Available", 0) or 0)
-            break
-
-    if rolls_available <= 0:
-        await interaction.response.send_message(
-            "❌ Your team has no rolls available right now.",
-            ephemeral=True
-        )
-        return
-
-    result = random.randint(1, 6)
-    await interaction.response.send_message(f"🎲 Your team rolled a {result}!")
-    log_command(
-        interaction.user.name,
-        "/roll",
-        {
-            "team": team_name,
-            "roll": result
-        }
-    )
-
-@bot.tree.command(name="customize", description="Tell the spreadsheet you want to customize your team")
-async def customize(interaction: discord.Interaction):
-    if interaction.channel_id != COMMAND_CHANNEL_ID:
-        await interaction.response.send_message(
-            "❌ You can only use this command in the designated command channel.", ephemeral=True
-        )
-        return
-
-    team_name = get_team(interaction.user) or "*No team*"
-    log_command(
-        interaction.user.name,
-        "/customize",
-        {
-            "team": team_name
-        }
-    )
-    await interaction.response.send_message(
-        "✅ Your customization request has been logged. The game board will update shortly.", ephemeral=True
-    )
-
+# ======= BossSelect Modal + View =======
 class BossSelectView(ui.View):
     def __init__(self, submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str):
         super().__init__(timeout=180)
         self.submitting_user = submitting_user
         self.submitted_for = submitted_for
         self.screenshot_url = screenshot_url
+
         self.bosses = list(boss_drops.keys())
         self.page_size = 25
         self.current_page = 0
@@ -512,6 +461,7 @@ class BossSelectView(ui.View):
                 boss=selected_boss,
             ),
         )
+
 
 class DropSelect(ui.Select):
     def __init__(self, submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str, boss: str):
@@ -602,14 +552,70 @@ class DropSelectView(ui.View):
         super().__init__(timeout=180)
         self.add_item(DropSelect(submitting_user, submitted_for, screenshot_url, boss))
 
+
+@bot.tree.command(name="roll", description="Roll a dice (1-6)")
+async def roll(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=False) # Public roll message
+    team_name = get_team(interaction.user) or "*No team*"
+    if team_name == "*No team*":
+        await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
+        return
+
+    records = team_data_sheet.get_all_records()
+    rolls_available = 0
+    for record in records:
+        if record.get("Team") == team_name:
+            rolls_available = int(record.get("Rolls Available", 0) or 0)
+            break
+
+    if rolls_available <= 0:
+        await interaction.followup.send(
+            "❌ Your team has no rolls available right now.",
+            ephemeral=True
+        )
+        return
+
+    result = random.randint(1, 6)
+    await interaction.followup.send(f"🎲 **{interaction.user.display_name}** from **{team_name}** rolled a **{result}**!")
+    log_command(
+        interaction.user.name,
+        "/roll",
+        {
+            "team": team_name,
+            "roll": result
+        }
+    )
+
+@bot.tree.command(name="customize", description="Open the customization panel for your team")
+async def customize(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    if interaction.channel_id != COMMAND_CHANNEL_ID:
+        await interaction.followup.send(
+            "❌ You can only use this command in the designated command channel.", ephemeral=True
+        )
+        return
+
+    team_name = get_team(interaction.user) or "*No team*"
+    log_command(
+        interaction.user.name,
+        "/customize",
+        {
+            "team": team_name
+        }
+    )
+    await interaction.followup.send(
+        "✅ Your customization request has been sent. The game board will update shortly.", ephemeral=True
+    )
+
 @bot.tree.command(name="submitdrop", description="Submit a boss drop for review")
-@discord.app_commands.describe(
+@app_commands.describe(
     screenshot="Attach a screenshot of the drop",
     submitted_for="User you are submitting the drop for (optional)",
 )
 async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attachment, submitted_for: Optional[discord.Member] = None):
+    await interaction.response.defer(ephemeral=True)
     if interaction.channel_id != COMMAND_CHANNEL_ID:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ You can only use this command in the designated command channel.", ephemeral=True
         )
         return
@@ -617,7 +623,7 @@ async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attac
     if submitted_for is None:
         submitted_for = interaction.user
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         content=f"Submitting drop for {submitted_for.display_name}. Select the boss you received the drop from:",
         view=BossSelectView(interaction.user, submitted_for, screenshot.url),
         ephemeral=True
@@ -660,7 +666,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
             description=f"**{team_name}** drew **{card_name}**!\n\n> {card_text}",
             color=discord.Color.gold() if card_type == "Chest" else discord.Color.blue()
         )
-        await log_chan.send(embed=embed)
+        await log_channel.send(embed=embed) # Use the passed log_channel
 
     except Exception as e:
         print(f"❌ Error in team_receives_card: {e}")
@@ -671,7 +677,7 @@ def get_held_cards(sheet_obj, team_name: str):
         data = sheet_obj.get_all_records()
         for idx, row in enumerate(data, start=2):
             held_by = row.get("Held By Team", "")
-            if team_name in held_by:
+            if held_by and team_name in held_by:
                 cards.append({
                     "row_index": idx,
                     "name": row.get("Name"),
@@ -712,9 +718,10 @@ async def show_cards(interaction: discord.Interaction):
 @bot.tree.command(name="use_card", description="Use a held card by its index from /show_cards")
 @app_commands.describe(index="The index of the card you want to use")
 async def use_card(interaction: discord.Interaction, index: int):
+    await interaction.response.defer(ephemeral=False) # Public message
     team_name = get_team(interaction.user)
     if not team_name:
-        await interaction.response.send_message("❌ You are not on a team.", ephemeral=True)
+        await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
         return
 
     chest_cards = get_held_cards(chest_sheet, team_name)
@@ -722,14 +729,13 @@ async def use_card(interaction: discord.Interaction, index: int):
     all_cards = chest_cards + chance_cards
 
     if index < 0 or index >= len(all_cards):
-        await interaction.response.send_message("❌ Invalid card index.", ephemeral=True)
+        await interaction.followup.send("❌ Invalid card index.", ephemeral=True)
         return
     
     selected_card = all_cards[index]
     card_type = "Chest" if index < len(chest_cards) else "Chance"
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     
-    # Log the command to the sheet for Godot to process
     log_command(
         interaction.user.name,
         "/use_card",
@@ -741,7 +747,6 @@ async def use_card(interaction: discord.Interaction, index: int):
         }
     )
     
-    # Remove team from the "Held By Team" column
     try:
         cell_val = card_sheet.cell(selected_card['row_index'], 3).value or ""
         teams = [t.strip() for t in cell_val.split(',') if t.strip()]
@@ -751,8 +756,6 @@ async def use_card(interaction: discord.Interaction, index: int):
     except Exception as e:
         print(f"❌ Error updating card ownership: {e}")
 
-    await interaction.response.send_message(f"✅ Your request to use **{selected_card['name']}** has been sent!")
-    
     log_chan = bot.get_channel(LOG_CHANNEL_ID)
     if log_chan:
         embed = discord.Embed(
@@ -761,6 +764,8 @@ async def use_card(interaction: discord.Interaction, index: int):
             color=discord.Color.green()
         )
         await log_chan.send(embed=embed)
+    
+    await interaction.followup.send(f"✅ **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
 
 
 @bot.event
