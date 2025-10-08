@@ -332,6 +332,7 @@ class DropReviewButtons(ui.View):
             # ==========================================================
             try:
                 item_values_records = item_values_sheet.get_all_records()
+                # THE ONLY CHANGE IS ON THE LINE BELOW
                 gp_lookup = {item['Item']: int(str(item['GP']).replace(',', '')) for item in item_values_records}
                 drop_gp_value = gp_lookup.get(self.drop, 0)
 
@@ -394,7 +395,6 @@ class DropReviewButtons(ui.View):
             await interaction.response.send_message("You must start reviewing before rejecting.", ephemeral=True)
             return
         await interaction.response.send_modal(RejectModal(self.message, self.submitted_user))
-
 
 # ======= BossSelect Modal + View =======
 class BossSelectView(ui.View):
@@ -778,4 +778,5 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
