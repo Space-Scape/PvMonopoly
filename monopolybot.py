@@ -344,7 +344,7 @@ class DropReviewButtons(ui.View):
                             team_data_sheet.update_cell(idx, 8, new_gp) # GP is in Column H (8)
                             print(f"✅ Awarded {drop_gp_value} GP to {team_name}. New total: {new_gp}")
                             if log_chan:
-                                await log_chan.send(f"💰 **{team_name}** earned **{drop_gp_value:,} GP** from a **{self.drop}** drop!")
+                                await log_chan.send(f"<:MaxCash:1347684049040183427> **{team_name}** earned **{drop_gp_value:,} GP** from a **{self.drop}** drop!")
                             break
             except Exception as e:
                 print(f"❌ Error during GP calculation: {e}")
@@ -630,7 +630,7 @@ async def gp(interaction: discord.Interaction):
             return
 
         embed = discord.Embed(
-            title=f"💰 {team_name} GP Balance 💰",
+            title=f"<:MaxCash:1347684049040183427> {team_name} GP Balance <:MaxCash:1347684049040183427>",
             description=f"Your team currently has **{team_gp:,} GP**.",
             color=discord.Color.gold()
         )
@@ -676,7 +676,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
 
         eligible_cards = []
         for i, row in enumerate(rows, start=2):
-            held_by = row.get("Held By Team", "")
+            held_by = str(row.get("Held By Team", ""))
             if team_name not in held_by:
                 eligible_cards.append({"index": i, "data": row})
         
@@ -710,7 +710,7 @@ def get_held_cards(sheet_obj, team_name: str):
     try:
         data = sheet_obj.get_all_records()
         for idx, row in enumerate(data, start=2):
-            held_by = row.get("Held By Team", "")
+            held_by = str(row.get("Held By Team", ""))
             if held_by and team_name in held_by:
                 cards.append({
                     "row_index": idx,
@@ -812,3 +812,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
