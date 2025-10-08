@@ -587,9 +587,8 @@ async def roll(interaction: discord.Interaction):
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
     if interaction.channel_id != COMMAND_CHANNEL_ID:
-        await interaction.followup.send(
+        await interaction.response.send_message(
             "❌ You can only use this command in the designated command channel.", ephemeral=True
         )
         return
@@ -602,7 +601,7 @@ async def customize(interaction: discord.Interaction):
             "team": team_name
         }
     )
-    await interaction.followup.send(
+    await interaction.response.send_message(
         "✅ Your customization request has been sent. The game board will update shortly.", ephemeral=True
     )
 
@@ -647,9 +646,8 @@ async def gp(interaction: discord.Interaction):
     submitted_for="User you are submitting the drop for (optional)",
 )
 async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attachment, submitted_for: Optional[discord.Member] = None):
-    await interaction.response.defer(ephemeral=True)
     if interaction.channel_id != COMMAND_CHANNEL_ID:
-        await interaction.followup.send(
+        await interaction.response.send_message(
             "❌ You can only use this command in the designated command channel.", ephemeral=True
         )
         return
@@ -657,7 +655,7 @@ async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attac
     if submitted_for is None:
         submitted_for = interaction.user
 
-    await interaction.followup.send(
+    await interaction.response.send_message(
         content=f"Submitting drop for {submitted_for.display_name}. Select the boss you received the drop from:",
         view=BossSelectView(interaction.user, submitted_for, screenshot.url),
         ephemeral=True
@@ -812,4 +810,3 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
