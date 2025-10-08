@@ -587,6 +587,7 @@ async def roll(interaction: discord.Interaction):
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
+    # This command is fast, so we don't need to defer.
     if interaction.channel_id != COMMAND_CHANNEL_ID:
         await interaction.response.send_message(
             "❌ You can only use this command in the designated command channel.", ephemeral=True
@@ -646,6 +647,7 @@ async def gp(interaction: discord.Interaction):
     submitted_for="User you are submitting the drop for (optional)",
 )
 async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attachment, submitted_for: Optional[discord.Member] = None):
+    # This command should also be fast. Reverting to the original logic without defer.
     if interaction.channel_id != COMMAND_CHANNEL_ID:
         await interaction.response.send_message(
             "❌ You can only use this command in the designated command channel.", ephemeral=True
@@ -674,7 +676,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
 
         eligible_cards = []
         for i, row in enumerate(rows, start=2):
-            held_by = str(row.get("Held By Team", ""))
+            held_by = str(row.get("Held By Team", "")) # Force to string
             if team_name not in held_by:
                 eligible_cards.append({"index": i, "data": row})
         
@@ -686,7 +688,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
         card_row_index = chosen_card["index"]
         card_data = chosen_card["data"]
         
-        held_by_str = str(card_sheet.cell(card_row_index, 3).value or "")
+        held_by_str = str(card_sheet.cell(card_row_index, 3).value or "") # Force to string
         new_held_by = f"{held_by_str}, {team_name}".strip(", ")
         card_sheet.update_cell(card_row_index, 3, new_held_by)
 
@@ -708,7 +710,7 @@ def get_held_cards(sheet_obj, team_name: str):
     try:
         data = sheet_obj.get_all_records()
         for idx, row in enumerate(data, start=2):
-            held_by = str(row.get("Held By Team", ""))
+            held_by = str(row.get("Held By Team", "")) # Force to string
             if held_by and team_name in held_by:
                 cards.append({
                     "row_index": idx,
@@ -810,3 +812,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
