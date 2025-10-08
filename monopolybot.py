@@ -688,7 +688,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
         card_row_index = chosen_card["index"]
         card_data = chosen_card["data"]
         
-        held_by_str = card_sheet.cell(card_row_index, 3).value or ""
+        held_by_str = str(card_sheet.cell(card_row_index, 3).value or "")
         new_held_by = f"{held_by_str}, {team_name}".strip(", ")
         card_sheet.update_cell(card_row_index, 3, new_held_by)
 
@@ -782,7 +782,7 @@ async def use_card(interaction: discord.Interaction, index: int):
     )
     
     try:
-        cell_val = card_sheet.cell(selected_card['row_index'], 3).value or ""
+        cell_val = str(card_sheet.cell(selected_card['row_index'], 3).value or "")
         teams = [t.strip() for t in cell_val.split(',') if t.strip()]
         if team_name in teams:
             teams.remove(team_name)
