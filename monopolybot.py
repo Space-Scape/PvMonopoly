@@ -274,7 +274,7 @@ class DropReviewButtons(ui.View):
                 status_field_index = i
                 break
         
-        status_value = (f"Currently being reviewed by {interaction.user.mention}" if self.current_reviewer else "Not currently being reviewed")
+        status_value = (f"Currently being reviewed by {self.current_reviewer.mention}" if self.current_reviewer else "Not currently being reviewed")
         
         if status_field_index != -1:
             embed.set_field_at(status_field_index, name="Review Status", value=status_value, inline=False)
@@ -332,7 +332,8 @@ class DropReviewButtons(ui.View):
             # ==========================================================
             try:
                 item_values_records = item_values_sheet.get_all_records()
-                gp_lookup = {item['Item']: int(item['GP']) for item in item_values_records}
+                # THE ONLY CHANGE IS ON THE LINE BELOW
+                gp_lookup = {item['Item']: int(str(item['GP']).replace(',', '')) for item in item_values_records}
                 drop_gp_value = gp_lookup.get(self.drop, 0)
 
                 if drop_gp_value > 0 and team_name != "*No team*":
@@ -394,7 +395,6 @@ class DropReviewButtons(ui.View):
             await interaction.response.send_message("You must start reviewing before rejecting.", ephemeral=True)
             return
         await interaction.response.send_modal(RejectModal(self.message, self.submitted_user))
-
 
 # ======= Commands =======
 @bot.tree.command(name="roll", description="Roll a dice (1-6)")
@@ -773,3 +773,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
