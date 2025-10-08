@@ -752,7 +752,7 @@ async def show_cards(interaction: discord.Interaction):
         card_list += f"**{i+offset}:** `[Chance]` {card['name']}\n"
         
     embed.description = card_list
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    await interaction.followup.send(embed=embed, ephemeral=False)
 
 @bot.tree.command(name="use_card", description="Use a held card by its index from /show_cards")
 @app_commands.describe(index="The index of the card you want to use")
@@ -817,6 +817,7 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
 
 
