@@ -728,31 +728,46 @@ def get_held_cards(sheet_obj, team_name: str):
 
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=False)
+    await interaction.response.defer(ephemeral=True)
     team_name = get_team(interaction.user)
     if not team_name:
-        await interaction.followup.send("❌ You don't have a team role assigned.", ephemeral=True)
+        await interaction.followup.send("❌ You don't have a team role assigned.", ephemeral=False)
         return
 
     chest_cards = get_held_cards(chest_sheet, team_name)
     chance_cards = get_held_cards(chance_sheet, team_name)
 
     if not chest_cards and not chance_cards:
-        await interaction.followup.send("Your team holds no cards.", ephemeral=True)
+        await interaction.followup.send("❌ Your team holds no cards.", ephemeral=False)
         return
 
-    embed = discord.Embed(title=f"{team_name}'s Hand", color=discord.Color.purple())
-    
-    card_list = ""
-    for i, card in enumerate(chest_cards):
-        card_list += f"**{i}:** `[Chest]` {card['name']}\n"
-    
+    embed = discord.Embed(
+        title=f"{team_name}'s Cards",
+        color=discord.Color.purple(),
+        description="Cards currently held by your team:\n"
+    )
+
+    # 🟣 Add Chest Cards
+    if chest_cards:
+        for i, card in enumerate(chest_cards):
+            embed.add_field(
+                name=f"🟡 [{i}] Chest Card — {card['name']}",
+                value=f"```{card['text']}```",
+                inline=False
+            )
+
+    # 🔵 Add Chance Cards
     offset = len(chest_cards)
-    for i, card in enumerate(chance_cards):
-        card_list += f"**{i+offset}:** `[Chance]` {card['name']}\n"
-        
-    embed.description = card_list
-    await interaction.followup.send(embed=embed, ephemeral=False)
+    if chance_cards:
+        for i, card in enumerate(chance_cards):
+            embed.add_field(
+                name=f"🔵 [{i+offset}] Chance Card — {card['name']}",
+                value=f"```{card['text']}```",
+                inline=False
+            )
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 @bot.tree.command(name="use_card", description="Use a held card by its index from /show_cards")
 @app_commands.describe(index="The index of the card you want to use")
@@ -817,6 +832,7 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
 
 
