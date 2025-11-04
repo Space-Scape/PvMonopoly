@@ -332,20 +332,30 @@ class DropReviewButtons(ui.View):
             # 🔹 START: GP CALCULATION LOGIC
             # ==========================================================
             try:
+                # ✅ NEW: Check for alchemy multiplier
+                gp_multiplier, consumed_card_name = check_and_consume_alchemy(team_name)
+                alchemy_bonus = ""
+
                 item_values_records = item_values_sheet.get_all_records()
                 gp_lookup = {item['Item']: int(str(item['GP']).replace(',', '')) for item in item_values_records}
-                drop_gp_value = gp_lookup.get(self.drop, 0)
+                
+                base_gp_value = gp_lookup.get(self.drop, 0)
+                final_gp_value = base_gp_value * gp_multiplier # Apply multiplier
+                
+                if gp_multiplier > 1 and consumed_card_name:
+                    alchemy_bonus = f" (x{gp_multiplier} from {consumed_card_name}!)"
 
-                if drop_gp_value > 0 and team_name != "*No team*":
+                if final_gp_value > 0 and team_name != "*No team*":
                     team_data_records = team_data_sheet.get_all_records()
                     for idx, record in enumerate(team_data_records, start=2):
                         if record.get("Team") == team_name:
                             current_gp = int(record.get("GP", 0) or 0)
-                            new_gp = current_gp + drop_gp_value
+                            new_gp = current_gp + final_gp_value # Add final value
                             team_data_sheet.update_cell(idx, 8, new_gp) # GP is in Column H (8)
-                            print(f"✅ Awarded {drop_gp_value} GP to {team_name}. New total: {new_gp}")
+                            print(f"✅ Awarded {final_gp_value} GP to {team_name}. New total: {new_gp}")
                             if log_chan:
-                                await log_chan.send(f"<:MaxCash:1347684049040183427> **{team_name}** earned **{drop_gp_value:,} GP** from a **{self.drop}** drop!")
+                                # ✅ UPDATED Log Message
+                                await log_chan.send(f"<:MaxCash:1347684049040183427> **{team_name}** earned **{final_gp_value:,} GP** from a **{self.drop}** drop!{alchemy_bonus}")
                             break
             except Exception as e:
                 print(f"❌ Error during GP calculation: {e}")
@@ -690,7 +700,7 @@ async def gp(interaction: discord.Interaction):
 
     except Exception as e:
         print(f"❌ Error in /gp command: {e}")
-        await interaction.followup.send("❌ An error occurred while fetching GP balance.", ephemeral=True)
+        await interaction.followSvcUp.send("❌ An error occurred while fetching GP balance.", ephemeral=True)
 
 
 @bot.tree.command(name="submitdrop", description="Submit a boss drop for review")
@@ -940,67 +950,64 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
     return False
 # ✅ END: Vengeance Helper Function
 
-# ✅ START: Retribution Helper Function
-def check_and_consume_retribution(target_team_name: str) -> bool:
+# ✅ START: Alchemy Helper Function
+def check_and_consume_alchemy(team_name: str) -> (int, str):
     """
-    Checks if a target team has Retribution active.
-    If yes, consumes it (clears wildcard AND held by) and returns True.
-    If no, returns False.
+    Checks if a team has an active Alchemy card.
+    If yes, consumes it and returns the multiplier (2 or 3) and card name.
+    If no, returns 1 and None.
     """
     try:
-        # 1. Find the Retribution card in the Chance sheet
-        # ✅ FIXED: Use get_all_values() to avoid caching
         chance_cards_data = chance_sheet.get_all_values()
         if not chance_cards_data:
-            return False
+            return 1, None
             
         headers = chance_cards_data[0]
         name_col = headers.index("Name")
         held_by_col = headers.index("Held By Team")
         wildcard_col = headers.index("Wildcard")
         
-        retribution_row_index = -1
-        retribution_wildcard_data = {}
-        
         for i, row in enumerate(chance_cards_data[1:], start=2): # Start from row 2
-            if len(row) > name_col and row[name_col] == "Retribution":
-                retribution_row_index = i
-                try:
-                    # ✅ FIXED: Check for empty string
-                    wildcard_str = row[wildcard_col] or "{}"
-                    retribution_wildcard_data = json.loads(wildcard_str)
-                except:
-                    retribution_wildcard_data = {}
-                break
-        
-        if retribution_row_index == -1:
-            print("ℹ️ Retribution card not found on sheet.")
-            return False # Retribution card not found
+            if len(row) <= max(name_col, held_by_col, wildcard_col):
+                continue
+                
+            card_name = row[name_col]
+            if card_name not in ("Low Alchemy", "High Alchemy"):
+                continue
 
-        # 2. Check if the target team has it "active"
-        # ✅ FIXED: check for str(val).strip()
-        team_status = retribution_wildcard_data.get(target_team_name)
-        if team_status and isinstance(team_status, str) and team_status.strip() == "active":
-            # 3. Consume it
-            # Remove from wildcard dict
-            del retribution_wildcard_data[target_team_name]
-            chance_sheet.update_cell(retribution_row_index, wildcard_col + 1, json.dumps(retribution_wildcard_data)) # +1 for 1-based index
+            try:
+                wildcard_str = row[wildcard_col] or "{}"
+                wildcard_data = json.loads(wildcard_str)
+            except:
+                wildcard_data = {}
+
+            team_status = wildcard_data.get(team_name)
             
-            # Remove from "Held By"
-            held_by_str = str(chance_sheet.cell(retribution_row_index, held_by_col + 1).value or "")
-            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
-            if target_team_name in teams:
-                teams.remove(target_team_name)
-            chance_sheet.update_cell(retribution_row_index, held_by_col + 1, ", ".join(teams))
-            
-            print(f"✅ Consumed Retribution for {target_team_name}")
-            return True
+            # Check for "low_alchemy" or "high_alchemy" status
+            if team_status and isinstance(team_status, str) and team_status.strip() in ("low_alchemy", "high_alchemy"):
+                multiplier = 3 if team_status.strip() == "high_alchemy" else 2
+                
+                # Consume the card
+                # Remove from wildcard dict
+                del wildcard_data[team_name]
+                chance_sheet.update_cell(i, wildcard_col + 1, json.dumps(wildcard_data)) # +1 for 1-based index
+                
+                # Remove from "Held By"
+                held_by_str = str(chance_sheet.cell(i, held_by_col + 1).value or "")
+                teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+                if team_name in teams:
+                    teams.remove(team_name)
+                chance_sheet.update_cell(i, held_by_col + 1, ", ".join(teams))
+                
+                print(f"✅ Consumed {card_name} for {team_name}, applying x{multiplier} GP multiplier.")
+                return multiplier, card_name
             
     except Exception as e:
-        print(f"❌ Error in check_and_consume_retribution: {e}")
+        print(f"❌ Error in check_and_consume_alchemy: {e}")
         
-    return False
-# ✅ END: Retribution Helper Function
+    return 1, None # Default multiplier
+# ✅ END: Alchemy Helper Function
+
 
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
@@ -1111,21 +1118,37 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
 
-        # --- Retribution ---
-        elif selected_card['name'] == "Retribution":
-            wildcard_data[team_name] = "active"
+        # --- Low Alchemy ---
+        elif selected_card['name'] == "Low Alchemy":
+            wildcard_data[team_name] = "low_alchemy"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
             is_status_activation = True # Mark as activation
             
-            embed_description = f"**{team_name}** used **Retribution**!\n\n> The next card effect used on them will be applied to a random team."
+            embed_description = f"**{team_name}** used **Low Alchemy**!\n\n> Your next drop this turn will be worth **double GP**."
             if log_chan:
                 embed = discord.Embed(
-                    title="🔄 Card Activated: Retribution",
+                    title="💰 Card Activated: Low Alchemy",
                     description=embed_description,
-                    color=discord.Color.from_rgb(172, 172, 172) # Silver
+                    color=discord.Color.from_rgb(204, 153, 0) # Gold
                 )
                 await log_chan.send(embed=embed)
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Retribution**!", ephemeral=False)
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Low Alchemy**!", ephemeral=False)
+
+        # --- High Alchemy ---
+        elif selected_card['name'] == "High Alchemy":
+            wildcard_data[team_name] = "high_alchemy"
+            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+            is_status_activation = True # Mark as activation
+            
+            embed_description = f"**{team_name}** used **High Alchemy**!\n\n> Your next drop this turn will be worth **triple GP**."
+            if log_chan:
+                embed = discord.Embed(
+                    title="💰💰 Card Activated: High Alchemy",
+                    description=embed_description,
+                    color=discord.Color.from_rgb(0, 204, 0) # Green
+                )
+                await log_chan.send(embed=embed)
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **High Alchemy**!", ephemeral=False)
 
         # --- Vile Vigour ---
         elif selected_card['name'] == "Vile Vigour" and isinstance(team_wildcard_value, int):
@@ -1187,32 +1210,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                             )
                             await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
 
-                    # ✅ CHECK FOR RETRIBUTION
-                    elif check_and_consume_retribution(target_team):
-                        # Redirect to a random team
-                        # Get all possible teams, remove the caster and the original target
-                        all_team_names = [record.get("Team") for record in all_teams_data if record.get("Team")]
-                        possible_new_targets = [t for t in all_team_names if t != team_name and t != target_team]
-                        
-                        if not possible_new_targets:
-                            # No one else to hit, effect fizzles
-                            embed_description += f"🛡️ **{target_team}** had Retribution! The effect fizzled as there were no other teams to target.\n"
-                        else:
-                            # Pick a new random target
-                            new_target = random.choice(possible_new_targets)
-                            log_command(
-                                team_name,
-                                "/card_effect_move",
-                                {"team": new_target, "move": move_amount}
-                            )
-                            embed_description += f"🛡️ **{target_team}** had Retribution! The effect was redirected to **{new_target}**!\q"
-                            if log_chan:
-                                skull_embed = discord.Embed(
-                                    title="🔄 Retribution Activated!",
-                                    description=f"You activated **{target_team}**'s Retribution!\nThe effect was redirected to **{new_target}**!",
-                                    color=discord.Color.dark_purple()
-                                )
-                                await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+                    # ✅ REMOVED RETRIBUTION CHECK
                     
                     else:
                         # Normal effect
@@ -1240,15 +1238,31 @@ async def use_card(interaction: discord.Interaction, index: int):
                 for i, row in enumerate(chance_data[1:], start=2):
                     if len(row) <= max(name_col, held_by_col, wildcard_col): continue
                     held_by_str = str(row[held_by_col] or "")
+                    
+                    # ✅ FIXED: Check if card is stealable
                     if held_by_str and team_name not in held_by_str:
-                        # This card is held by someone else
-                        stealable_cards.append({
-                            "sheet": chance_sheet,
-                            "row_index": i,
-                            "card_name": str(row[name_col]),
-                            "card_type": "Chance",
-                            "victim_team": held_by_str.strip() # Assumes one team for chance
-                        })
+                        # Card is held by someone else. Now check if it's "active".
+                        is_active = False
+                        wildcard_str = str(row[wildcard_col] or "{}")
+                        if wildcard_str != "{}":
+                            try:
+                                wildcard_data_json = json.loads(wildcard_str)
+                                victim_team = held_by_str.strip() # Chance cards only have one holder
+                                victim_status = wildcard_data_json.get(victim_team)
+                                if victim_status and isinstance(victim_status, str) and victim_status.strip() == "active":
+                                    is_active = True
+                            except:
+                                pass # Ignore parse errors
+                        
+                        if not is_active:
+                            # This card is held by someone else AND is not active
+                            stealable_cards.append({
+                                "sheet": chance_sheet,
+                                "row_index": i,
+                                "card_name": str(row[name_col]),
+                                "card_type": "Chance",
+                                "victim_team": held_by_str.strip() # Assumes one team for chance
+                            })
 
             # Check Chest cards
             chest_data = chest_sheet.get_all_values()
@@ -1261,18 +1275,35 @@ async def use_card(interaction: discord.Interaction, index: int):
                 for i, row in enumerate(chest_data[1:], start=2):
                     if len(row) <= max(name_col, held_by_col, wildcard_col): continue
                     held_by_str = str(row[held_by_col] or "")
+                    
                     if held_by_str and team_name not in held_by_str:
                         # This card is held by at least one other team
                         all_holders = [t.strip() for t in held_by_str.split(',') if t.strip()]
-                        victim_team = random.choice(all_holders) # Pick one team to steal from
                         
-                        stealable_cards.append({
-                            "sheet": chest_sheet,
-                            "row_index": i,
-                            "card_name": str(row[name_col]),
-                            "card_type": "Chest",
-                            "victim_team": victim_team
-                        })
+                        # ✅ FIXED: Check for active status before adding
+                        wildcard_str = str(row[wildcard_col] or "{}")
+                        wildcard_data_json = {}
+                        try:
+                            wildcard_data_json = json.loads(wildcard_str)
+                        except:
+                            pass
+
+                        # Find a victim that doesn't have an "active" status for this card
+                        valid_victims = []
+                        for holder in all_holders:
+                            holder_status = wildcard_data_json.get(holder)
+                            if not (holder_status and isinstance(holder_status, str) and holder_status.strip() == "active"):
+                                valid_victims.append(holder)
+
+                        if valid_victims:
+                            victim_team = random.choice(valid_victims) # Pick one valid victim
+                            stealable_cards.append({
+                                "sheet": chest_sheet,
+                                "row_index": i,
+                                "card_name": str(row[name_col]),
+                                "card_type": "Chest",
+                                "victim_team": victim_team
+                            })
             
             if not stealable_cards:
                 embed_description = f"**{team_name}** used **Rogue's Gloves**... but there was nothing to steal!"
@@ -1295,11 +1326,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                 # 2. Transfer Wildcard Data
                 wildcard_str = str(target_sheet.cell(target_row, 4).value or "{}")
                 try:
-                    wildcard_data = json.loads(wildcard_str)
-                    victim_wildcard = wildcard_data.pop(victim_team, None)
+                    wildcard_data_json = json.loads(wildcard_str)
+                    victim_wildcard = wildcard_data_json.pop(victim_team, None)
                     if victim_wildcard:
-                        wildcard_data[team_name] = victim_wildcard
-                        target_sheet.update_cell(target_row, 4, json.dumps(wildcard_data))
+                        wildcard_data_json[team_name] = victim_wildcard
+                        target_sheet.update_cell(target_row, 4, json.dumps(wildcard_data_json))
                 except Exception as e:
                     print(f"❌ Error transferring wildcard data: {e}")
 
