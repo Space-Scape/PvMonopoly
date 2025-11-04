@@ -925,6 +925,55 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
     return False
 # ✅ END: Vengeance Helper Function
 
+# ✅ START: Retribution Helper Function
+def check_and_consume_retribution(target_team_name: str) -> bool:
+    """
+    Checks if a target team has Retribution active.
+    If yes, consumes it (clears wildcard AND held by) and returns True.
+    If no, returns False.
+    """
+    try:
+        # 1. Find the Retribution card in the Chance sheet
+        chance_cards_data = chance_sheet.get_all_records()
+        retribution_row_index = -1
+        retribution_wildcard_data = {}
+        
+        for i, row in enumerate(chance_cards_data, start=2):
+            if row.get("Name") == "Retribution":
+                retribution_row_index = i
+                try:
+                    retribution_wildcard_data = json.loads(row.get("Wildcard") or "{}")
+                except:
+                    retribution_wildcard_data = {}
+                break
+        
+        if retribution_row_index == -1:
+            print("ℹ️ Retribution card not found on sheet.")
+            return False # Retribution card not found
+
+        # 2. Check if the target team has it "active"
+        if retribution_wildcard_data.get(target_team_name) == "active":
+            # 3. Consume it
+            # Remove from wildcard dict
+            del retribution_wildcard_data[target_team_name]
+            chance_sheet.update_cell(retribution_row_index, 4, json.dumps(retribution_wildcard_data)) # Update Col D
+            
+            # Remove from "Held By"
+            held_by_str = str(chance_sheet.cell(retribution_row_index, 3).value or "")
+            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+            if target_team_name in teams:
+                teams.remove(target_team_name)
+            chance_sheet.update_cell(retribution_row_index, 3, ", ".join(teams))
+            
+            print(f"✅ Consumed Retribution for {target_team_name}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error in check_and_consume_retribution: {e}")
+        
+    return False
+# ✅ END: Retribution Helper Function
+
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
@@ -1029,6 +1078,22 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
 
+        # --- Retribution ---
+        elif selected_card['name'] == "Retribution":
+            wildcard_data[team_name] = "active"
+            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+            is_status_activation = True # Mark as activation
+            
+            embed_description = f"**{team_name}** used **Retribution**!\n\n> The next card effect used on them will be applied to a random team."
+            if log_chan:
+                embed = discord.Embed(
+                    title="🔄 Card Activated: Retribution",
+                    description=embed_description,
+                    color=discord.Color.from_rgb(172, 172, 172) # Silver
+                )
+                await log_chan.send(embed=embed)
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Retribution**!", ephemeral=False)
+
         # --- Vile Vigour ---
         elif selected_card['name'] == "Vile Vigour" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
@@ -1087,8 +1152,35 @@ async def use_card(interaction: discord.Interaction, index: int):
                                 description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{stored_roll}** spaces!",
                                 color=discord.Color.dark_red()
                             )
-                            # Try to send to the caster's team channel or just log
                             await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+
+                    # ✅ CHECK FOR RETRIBUTION
+                    elif check_and_consume_retribution(target_team):
+                        # Redirect to a random team
+                        # Get all possible teams, remove the caster and the original target
+                        all_team_names = [record.get("Team") for record in all_teams_data if record.get("Team")]
+                        possible_new_targets = [t for t in all_team_names if t != team_name and t != target_team]
+                        
+                        if not possible_new_targets:
+                            # No one else to hit, effect fizzles
+                            embed_description += f"🛡️ **{target_team}** had Retribution! The effect fizzled as there were no other teams to target.\n"
+                        else:
+                            # Pick a new random target
+                            new_target = random.choice(possible_new_targets)
+                            log_command(
+                                team_name,
+                                "/card_effect_move",
+                                {"team": new_target, "move": move_amount}
+                            )
+                            embed_description += f"🛡️ **{target_team}** had Retribution! The effect was redirected to **{new_target}**!\n"
+                            if log_chan:
+                                skull_embed = discord.Embed(
+                                    title="🔄 Retribution Activated!",
+                                    description=f"You activated **{target_team}**'s Retribution!\nThe effect was redirected to **{new_target}**!",
+                                    color=discord.Color.dark_purple()
+                                )
+                                await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+                    
                     else:
                         # Normal effect
                         log_command(
@@ -1145,7 +1237,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
-
-
 
