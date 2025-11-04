@@ -563,10 +563,19 @@ async def roll(interaction: discord.Interaction):
 
     records = team_data_sheet.get_all_records()
     rolls_available = 0
-    for record in records:
+    current_tile = 0
+    team_row_index = -1
+
+    for idx, record in enumerate(records, start=2):
         if record.get("Team") == team_name:
             rolls_available = int(record.get("Rolls Available", 0) or 0)
+            current_tile = int(record.get("Position", 0) or 0)
+            team_row_index = idx
             break
+    
+    if team_row_index == -1:
+        await interaction.followup.send(f"❌ Could not find data for **{team_name}**.", ephemeral=True)
+        return
 
     if rolls_available <= 0:
         await interaction.followup.send(
@@ -576,7 +585,8 @@ async def roll(interaction: discord.Interaction):
         return
 
     result = random.randint(1, 6)
-    await interaction.followup.send(f"🎲 **{interaction.user.display_name}** from **{team_name}** rolled a **{result}**!")
+    
+    # Log the command for Godot to process the move
     log_command(
         interaction.user.name,
         "/roll",
@@ -585,6 +595,47 @@ async def roll(interaction: discord.Interaction):
             "roll": result
         }
     )
+    
+    # Manually decrement rolls in the sheet
+    try:
+        decrement_rolls_available(team_name)
+    except Exception as e:
+        print(f"❌ Error decrementing rolls from /roll command: {e}")
+
+    # Calculate new position to check for card tiles
+    new_pos = (current_tile + result) % BOARD_SIZE
+
+    # Handle special movement tiles (must match Apps Script)
+    if new_pos == 12:
+        new_pos = 28 if current_tile != 38 else 12
+    elif new_pos == 28:
+        new_pos = 38 if current_tile != 12 else 28
+    elif new_pos == 38:
+        new_pos = 12 if current_tile != 28 else 38
+    elif new_pos == 30:
+        new_pos = 10
+    
+    # Send roll result
+    roll_embed = discord.Embed(
+        title=f"🎲 {team_name} Rolled!",
+        description=f"**{interaction.user.display_name}** rolled a **{result}**!",
+        color=discord.Color.blue()
+    )
+    await interaction.followup.send(embed=roll_embed)
+
+    # Check for card tiles AFTER moving
+    log_chan = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_chan:
+        print(f"❌ Log channel {LOG_CHANNEL_ID} not found, can't send card embeds.")
+        return
+
+    if new_pos in CHEST_TILES:
+        print(f"ℹ️ {team_name} landed on CHEST tile {new_pos}")
+        await team_receives_card(team_name, "Chest", log_chan)
+    elif new_pos in CHANCE_TILES:
+        print(f"ℹ️ {team_name} landed on CHANCE tile {new_pos}")
+        await team_receives_card(team_name, "Chance", log_chan)
+
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
@@ -775,6 +826,8 @@ def get_held_cards(sheet_obj, team_name: str):
     try:
         # Get all values (including wildcard column)
         data = sheet_obj.get_all_values() 
+        if not data: # Handle empty sheet
+            return []
         headers = data[0]
         
         # Find column indexes
@@ -788,21 +841,28 @@ def get_held_cards(sheet_obj, team_name: str):
             return []
 
         for idx, row in enumerate(data[1:], start=2): # Start from row 2
+            # Ensure row has enough columns
+            if len(row) <= max(name_col, text_col, held_by_col, wildcard_col):
+                continue # Skip malformed row
+                
             held_by = str(row[held_by_col] or "")
             
             if team_name in held_by:
                 card_text = str(row[text_col] or "")
                 
                 # ✅ Check for wildcard
-                if "%d6" in card_text:
-                    wildcard_data_str = str(row[wildcard_col] or "{}")
+                wildcard_data_str = str(row[wildcard_col] or "{}")
+                if "%d6" in card_text or "active" in wildcard_data_str:
                     try:
                         wildcard_data = json.loads(wildcard_data_str)
-                        stored_roll = wildcard_data.get(team_name)
+                        stored_val = wildcard_data.get(team_name)
                         
-                        if stored_roll:
-                            # Replace %d6 with the stored number
-                            card_text = card_text.replace("%d6", str(stored_roll))
+                        if stored_val:
+                            if isinstance(stored_val, int): # It's a number
+                                card_text = card_text.replace("%d6", str(stored_val))
+                            elif stored_val == "active": # It's a status
+                                card_text += " **(ACTIVE)**"
+                                
                     except Exception as e:
                         print(f"❌ Error parsing wildcard JSON for {team_name}: {wildcard_data_str} | {e}")
                         
@@ -816,6 +876,46 @@ def get_held_cards(sheet_obj, team_name: str):
     return cards
 # ✅ END: Updated 'get_held_cards' function
 
+# ✅ START: New Vengeance Helper Function
+def check_and_consume_vengeance(target_team_name: str) -> bool:
+    """
+    Checks if a target team has Vengeance active.
+    If yes, consumes it and returns True.
+    If no, returns False.
+    """
+    try:
+        # 1. Find the Vengeance card in the Chance sheet
+        chance_cards_data = chance_sheet.get_all_records()
+        vengeance_row_index = -1
+        vengeance_wildcard_data = {}
+        
+        for i, row in enumerate(chance_cards_data, start=2):
+            if row.get("Name") == "Vengeance":
+                vengeance_row_index = i
+                try:
+                    vengeance_wildcard_data = json.loads(row.get("Wildcard") or "{}")
+                except:
+                    vengeance_wildcard_data = {}
+                break
+        
+        if vengeance_row_index == -1:
+            print("ℹ️ Vengeance card not found on sheet.")
+            return False # Vengeance card not found
+
+        # 2. Check if the target team has it "active"
+        if vengeance_wildcard_data.get(target_team_name) == "active":
+            # 3. Consume it (remove from wildcard dict)
+            del vengeance_wildcard_data[target_team_name]
+            chance_sheet.update_cell(vengeance_row_index, 4, json.dumps(vengeance_wildcard_data)) # Update Col D
+            print(f"✅ Consumed Vengeance for {target_team_name}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error in check_and_consume_vengeance: {e}")
+        
+    return False
+# ✅ END: New Vengeance Helper Function
+
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
@@ -824,7 +924,7 @@ async def show_cards(interaction: discord.Interaction):
         await interaction.followup.send("❌ You don't have a team role assigned.", ephemeral=False)
         return
 
-    # ✅ get_held_cards now correctly parses wildcards
+    # ✅ get_held_cards now correctly parses wildcards and 'active' status
     chest_cards = get_held_cards(chest_sheet, team_name)
     chance_cards = get_held_cards(chance_sheet, team_name)
 
@@ -886,73 +986,126 @@ async def use_card(interaction: discord.Interaction, index: int):
     
     stored_roll = None
     final_card_text = selected_card['text']
+    log_chan = bot.get_channel(LOG_CHANNEL_ID)
 
     try:
-        # --- 1. Clear Wildcard Data ---
+        # --- 1. Get Wildcard Data ---
         wildcard_data_str = card_sheet.cell(card_row, 4).value or "{}"
-        if wildcard_data_str != "{}":
-            try:
-                wildcard_data = json.loads(wildcard_data_str)
-                stored_roll = wildcard_data.pop(team_name, None) # Remove team's roll
-                card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-                print(f"✅ Cleared wildcard for {team_name} from card {selected_card['name']}")
-            except Exception as e:
-                print(f"❌ Error clearing wildcard: {e}")
+        wildcard_data = {}
+        team_wildcard_value = None
+        try:
+            wildcard_data = json.loads(wildcard_data_str)
+            team_wildcard_value = wildcard_data.get(team_name)
+        except Exception as e:
+            print(f"❌ Error parsing wildcard for {team_name}: {e}")
+
+        # --- 2. Handle Card Effect ---
         
-        # --- 2. Remove Team from "Held By" ---
-        cell_val = str(card_sheet.cell(card_row, 3).value or "")
-        teams = [t.strip() for t in cell_val.split(',') if t.strip()]
-        if team_name in teams:
-            teams.remove(team_name)
-        card_sheet.update_cell(card_row, 3, ", ".join(teams))
+        # --- Vengeance ---
+        if selected_card['name'] == "Vengeance":
+            wildcard_data[team_name] = "active"
+            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+            # Note: We do NOT remove the team from "Held By"
+            
+            embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
+            if log_chan:
+                embed = discord.Embed(
+                    title="🛡️ Card Activated: Vengeance",
+                    description=embed_description,
+                    color=discord.Color.from_rgb(172, 172, 172) # Silver
+                )
+                await log_chan.send(embed=embed)
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
+            return # Stop here, card is activated, not "used up"
 
-        # --- 3. Handle Card Effect ---
-        embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
-        log_chan = bot.get_channel(LOG_CHANNEL_ID)
-
-        if selected_card['name'] == "Vile Vigour" and stored_roll:
-            # Log the new command for Godot
+        # --- Vile Vigour ---
+        elif selected_card['name'] == "Vile Vigour" and isinstance(team_wildcard_value, int):
+            stored_roll = team_wildcard_value
             log_command(
                 team_name, 
                 "/card_effect_move", 
                 {"team": team_name, "move": stored_roll}
             )
-            # Update embed text for confirmation
             embed_description = f"**{team_name}** used **Vile Vigour** and moved **{stored_roll}** spaces forward!"
-        
-        elif selected_card['name'] == "Dragon Spear" and stored_roll:
-            move_amount = -int(stored_roll) # Move back
+
+        # --- Dragon Spear ---
+        elif selected_card['name'] == "Dragon Spear" and isinstance(team_wildcard_value, int):
+            stored_roll = team_wildcard_value
+            move_amount = -stored_roll # Move back
             
-            # Find all teams on the user's tile
+            # Find targets
             all_teams_data = team_data_sheet.get_all_records()
-            user_tile = -1
-            teams_to_move = []
+            caster_pos = -1
+            targets = []
             
-            for team in all_teams_data:
-                if team.get("Team") == team_name:
-                    user_tile = int(team.get("Position", -1))
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
                     break
             
-            if user_tile != -1:
-                for team in all_teams_data:
-                    team_on_tile = team.get("Team")
-                    if team_on_tile != team_name and int(team.get("Position", -2)) == user_tile:
-                        teams_to_move.append(team_on_tile)
-            
-            if teams_to_move:
-                embed_description = f"**{team_name}** used **Dragon Spear**!\n"
-                for opponent_team in teams_to_move:
-                    log_command(
-                        team_name, # Logged by the user
-                        "/card_effect_move",
-                        {"team": opponent_team, "move": move_amount}
-                    )
-                    embed_description += f"**{opponent_team}** was moved back **{stored_roll}** tiles!\n"
-            else:
-                embed_description = f"**{team_name}** used **Dragon Spear**, but no opponents were on the same tile!"
+            if caster_pos == -1:
+                await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                return
 
+            for record in all_teams_data:
+                opponent_team_name = record.get("Team")
+                if opponent_team_name == team_name:
+                    continue
+                
+                if int(record.get("Position", -1)) == caster_pos:
+                    targets.append(opponent_team_name)
+            
+            # Log effects and build embed
+            embed_description = f"**{team_name}** used **Dragon Spear**!\n\n"
+            if not targets:
+                embed_description += "No other teams were on the same tile."
+            else:
+                for target_team in targets:
+                    # ✅ CHECK FOR VENGEANCE
+                    if check_and_consume_vengeance(target_team):
+                        # Rebound
+                        log_command(
+                            team_name, # Logged by the caster
+                            "/card_effect_move",
+                            {"team": team_name, "move": move_amount} # Move the caster
+                        )
+                        embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
+                        if log_chan:
+                            skull_embed = discord.Embed(
+                                title="💀 Vengeance Activated!",
+                                description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{stored_roll}** spaces!",
+                                color=discord.Color.dark_red()
+                            )
+                            # Try to send to the caster's team channel or just log
+                            await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+                    else:
+                        # Normal effect
+                        log_command(
+                            team_name, # Logged by the caster
+                            "/card_effect_move",
+                            {"team": target_team, "move": move_amount} # Move the target
+                        )
+                        embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
+
+        # --- Other Cards (default use) ---
+        else:
+            embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
         
-        # --- 4. Send Confirmation Embed ---
+
+        # --- 3. Clear Wildcard Data (if any) ---
+        if team_wildcard_value is not None:
+            wildcard_data.pop(team_name, None) # Remove team's roll/status
+            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+            print(f"✅ Cleared wildcard for {team_name} from card {selected_card['name']}")
+        
+        # --- 4. Remove Team from "Held By" ---
+        cell_val = str(card_sheet.cell(card_row, 3).value or "")
+        teams = [t.strip() for t in cell_val.split(',') if t.strip()]
+        if team_name in teams:
+            teams.remove(team_name)
+        card_sheet.update_cell(card_row, 3, ", ".join(teams))
+        
+        # --- 5. Send Confirmation Embed ---
         if log_chan:
             embed = discord.Embed(
                 title=f"🃏 Card Played: {selected_card['name']}",
