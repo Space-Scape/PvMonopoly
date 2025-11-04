@@ -778,7 +778,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                await log_channel.send(f"ℹ️ **{team_name}** tried to draw a {card_type} card, but none were available!")
+                await log_chan.send(f"ℹ️ **{team_name}** tried to draw a {card_type} card, but none were available!")
                 return
 
             chosen_card = random.choice(eligible_cards)
@@ -852,7 +852,8 @@ def get_held_cards(sheet_obj, team_name: str):
                 
                 # ✅ Check for wildcard
                 wildcard_data_str = str(row[wildcard_col] or "{}")
-                if "%d6" in card_text or "active" in wildcard_data_str:
+                # ✅ FIXED: Always check JSON, not just if 'active' is in the string
+                if wildcard_data_str != "{}" and wildcard_data_str:
                     try:
                         wildcard_data = json.loads(wildcard_data_str)
                         stored_val = wildcard_data.get(team_name)
@@ -860,7 +861,8 @@ def get_held_cards(sheet_obj, team_name: str):
                         if stored_val:
                             if isinstance(stored_val, int): # It's a number
                                 card_text = card_text.replace("%d6", str(stored_val))
-                            elif stored_val == "active": # It's a status
+                            # ✅ FIXED: check for str(stored_val).strip()
+                            elif isinstance(stored_val, str) and stored_val.strip() == "active": # It's a status
                                 card_text += " **(ACTIVE)**"
                                 
                     except Exception as e:
@@ -885,15 +887,26 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
     """
     try:
         # 1. Find the Vengeance card in the Chance sheet
-        chance_cards_data = chance_sheet.get_all_records()
+        # ✅ FIXED: Use get_all_values() to avoid caching
+        chance_cards_data = chance_sheet.get_all_values()
+        if not chance_cards_data:
+            return False
+            
+        headers = chance_cards_data[0]
+        name_col = headers.index("Name")
+        held_by_col = headers.index("Held By Team")
+        wildcard_col = headers.index("Wildcard")
+        
         vengeance_row_index = -1
         vengeance_wildcard_data = {}
         
-        for i, row in enumerate(chance_cards_data, start=2):
-            if row.get("Name") == "Vengeance":
+        for i, row in enumerate(chance_cards_data[1:], start=2): # Start from row 2
+            if len(row) > name_col and row[name_col] == "Vengeance":
                 vengeance_row_index = i
                 try:
-                    vengeance_wildcard_data = json.loads(row.get("Wildcard") or "{}")
+                    # ✅ FIXED: Check for empty string
+                    wildcard_str = row[wildcard_col] or "{}"
+                    vengeance_wildcard_data = json.loads(wildcard_str)
                 except:
                     vengeance_wildcard_data = {}
                 break
@@ -903,18 +916,20 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
             return False # Vengeance card not found
 
         # 2. Check if the target team has it "active"
-        if vengeance_wildcard_data.get(target_team_name) == "active":
+        # ✅ FIXED: check for str(val).strip()
+        team_status = vengeance_wildcard_data.get(target_team_name)
+        if team_status and isinstance(team_status, str) and team_status.strip() == "active":
             # 3. Consume it
             # Remove from wildcard dict
             del vengeance_wildcard_data[target_team_name]
-            chance_sheet.update_cell(vengeance_row_index, 4, json.dumps(vengeance_wildcard_data)) # Update Col D
+            chance_sheet.update_cell(vengeance_row_index, wildcard_col + 1, json.dumps(vengeance_wildcard_data)) # +1 for 1-based index
             
             # Remove from "Held By"
-            held_by_str = str(chance_sheet.cell(vengeance_row_index, 3).value or "")
+            held_by_str = str(chance_sheet.cell(vengeance_row_index, held_by_col + 1).value or "")
             teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
             if target_team_name in teams:
                 teams.remove(target_team_name)
-            chance_sheet.update_cell(vengeance_row_index, 3, ", ".join(teams))
+            chance_sheet.update_cell(vengeance_row_index, held_by_col + 1, ", ".join(teams))
             
             print(f"✅ Consumed Vengeance for {target_team_name}")
             return True
@@ -934,15 +949,26 @@ def check_and_consume_retribution(target_team_name: str) -> bool:
     """
     try:
         # 1. Find the Retribution card in the Chance sheet
-        chance_cards_data = chance_sheet.get_all_records()
+        # ✅ FIXED: Use get_all_values() to avoid caching
+        chance_cards_data = chance_sheet.get_all_values()
+        if not chance_cards_data:
+            return False
+            
+        headers = chance_cards_data[0]
+        name_col = headers.index("Name")
+        held_by_col = headers.index("Held By Team")
+        wildcard_col = headers.index("Wildcard")
+        
         retribution_row_index = -1
         retribution_wildcard_data = {}
         
-        for i, row in enumerate(chance_cards_data, start=2):
-            if row.get("Name") == "Retribution":
+        for i, row in enumerate(chance_cards_data[1:], start=2): # Start from row 2
+            if len(row) > name_col and row[name_col] == "Retribution":
                 retribution_row_index = i
                 try:
-                    retribution_wildcard_data = json.loads(row.get("Wildcard") or "{}")
+                    # ✅ FIXED: Check for empty string
+                    wildcard_str = row[wildcard_col] or "{}"
+                    retribution_wildcard_data = json.loads(wildcard_str)
                 except:
                     retribution_wildcard_data = {}
                 break
@@ -952,18 +978,20 @@ def check_and_consume_retribution(target_team_name: str) -> bool:
             return False # Retribution card not found
 
         # 2. Check if the target team has it "active"
-        if retribution_wildcard_data.get(target_team_name) == "active":
+        # ✅ FIXED: check for str(val).strip()
+        team_status = retribution_wildcard_data.get(target_team_name)
+        if team_status and isinstance(team_status, str) and team_status.strip() == "active":
             # 3. Consume it
             # Remove from wildcard dict
             del retribution_wildcard_data[target_team_name]
-            chance_sheet.update_cell(retribution_row_index, 4, json.dumps(retribution_wildcard_data)) # Update Col D
+            chance_sheet.update_cell(retribution_row_index, wildcard_col + 1, json.dumps(retribution_wildcard_data)) # +1 for 1-based index
             
             # Remove from "Held By"
-            held_by_str = str(chance_sheet.cell(retribution_row_index, 3).value or "")
+            held_by_str = str(chance_sheet.cell(retribution_row_index, held_by_col + 1).value or "")
             teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
             if target_team_name in teams:
                 teams.remove(target_team_name)
-            chance_sheet.update_cell(retribution_row_index, 3, ", ".join(teams))
+            chance_sheet.update_cell(retribution_row_index, held_by_col + 1, ", ".join(teams))
             
             print(f"✅ Consumed Retribution for {target_team_name}")
             return True
@@ -1056,7 +1084,12 @@ async def use_card(interaction: discord.Interaction, index: int):
         team_wildcard_value = None
         try:
             wildcard_data = json.loads(wildcard_data_str)
-            team_wildcard_value = wildcard_data.get(team_name)
+            # ✅ FIXED: check for str(val).strip()
+            val = wildcard_data.get(team_name)
+            if val and isinstance(val, str):
+                team_wildcard_value = val.strip()
+            else:
+                team_wildcard_value = val
         except Exception as e:
             print(f"❌ Error parsing wildcard for {team_name}: {e}")
 
@@ -1172,7 +1205,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                                 "/card_effect_move",
                                 {"team": new_target, "move": move_amount}
                             )
-                            embed_description += f"🛡️ **{target_team}** had Retribution! The effect was redirected to **{new_target}**!\n"
+                            embed_description += f"🛡️ **{target_team}** had Retribution! The effect was redirected to **{new_target}**!\q"
                             if log_chan:
                                 skull_embed = discord.Embed(
                                     title="🔄 Retribution Activated!",
@@ -1189,6 +1222,97 @@ async def use_card(interaction: discord.Interaction, index: int):
                             {"team": target_team, "move": move_amount} # Move the target
                         )
                         embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
+
+        # --- Rogue's Gloves ---
+        elif selected_card['name'] == "Rogue's Gloves":
+            
+            # --- Build a list of all stealable cards ---
+            stealable_cards = []
+            
+            # Check Chance cards
+            chance_data = chance_sheet.get_all_values()
+            if chance_data:
+                headers = chance_data[0]
+                name_col = headers.index("Name")
+                held_by_col = headers.index("Held By Team")
+                wildcard_col = headers.index("Wildcard")
+                
+                for i, row in enumerate(chance_data[1:], start=2):
+                    if len(row) <= max(name_col, held_by_col, wildcard_col): continue
+                    held_by_str = str(row[held_by_col] or "")
+                    if held_by_str and team_name not in held_by_str:
+                        # This card is held by someone else
+                        stealable_cards.append({
+                            "sheet": chance_sheet,
+                            "row_index": i,
+                            "card_name": str(row[name_col]),
+                            "card_type": "Chance",
+                            "victim_team": held_by_str.strip() # Assumes one team for chance
+                        })
+
+            # Check Chest cards
+            chest_data = chest_sheet.get_all_values()
+            if chest_data:
+                headers = chest_data[0]
+                name_col = headers.index("Name")
+                held_by_col = headers.index("Held By Team")
+                wildcard_col = headers.index("Wildcard")
+
+                for i, row in enumerate(chest_data[1:], start=2):
+                    if len(row) <= max(name_col, held_by_col, wildcard_col): continue
+                    held_by_str = str(row[held_by_col] or "")
+                    if held_by_str and team_name not in held_by_str:
+                        # This card is held by at least one other team
+                        all_holders = [t.strip() for t in held_by_str.split(',') if t.strip()]
+                        victim_team = random.choice(all_holders) # Pick one team to steal from
+                        
+                        stealable_cards.append({
+                            "sheet": chest_sheet,
+                            "row_index": i,
+                            "card_name": str(row[name_col]),
+                            "card_type": "Chest",
+                            "victim_team": victim_team
+                        })
+            
+            if not stealable_cards:
+                embed_description = f"**{team_name}** used **Rogue's Gloves**... but there was nothing to steal!"
+            else:
+                # --- A card was found, let's steal it ---
+                stolen_card = random.choice(stealable_cards)
+                victim_team = stolen_card["victim_team"]
+                target_sheet = stolen_card["sheet"]
+                target_row = stolen_card["row_index"]
+                
+                # 1. Update "Held By Team"
+                held_by_str = str(target_sheet.cell(target_row, 3).value or "")
+                teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+                if victim_team in teams:
+                    teams.remove(victim_team)
+                if team_name not in teams:
+                    teams.append(team_name)
+                target_sheet.update_cell(target_row, 3, ", ".join(teams))
+
+                # 2. Transfer Wildcard Data
+                wildcard_str = str(target_sheet.cell(target_row, 4).value or "{}")
+                try:
+                    wildcard_data = json.loads(wildcard_str)
+                    victim_wildcard = wildcard_data.pop(victim_team, None)
+                    if victim_wildcard:
+                        wildcard_data[team_name] = victim_wildcard
+                        target_sheet.update_cell(target_row, 4, json.dumps(wildcard_data))
+                except Exception as e:
+                    print(f"❌ Error transferring wildcard data: {e}")
+
+                embed_description = f"**{team_name}** used **Rogue's Gloves** and stole **{stolen_card['card_name']}** from **{victim_team}**!"
+                
+                # Send a message to the victim
+                if log_chan:
+                    victim_embed = discord.Embed(
+                        title="‼️ Card Stolen!",
+                        description=f"**{team_name}** used **Rogue's Gloves** and stole your **{stolen_card['card_name']}** card!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
 
         # --- Other Cards (default use) ---
         else:
@@ -1237,6 +1361,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
-
 
