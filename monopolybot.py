@@ -71,6 +71,7 @@ CHANCE_TILES = [7, 22, 36]
 # ---------------------------
 # 🔹 Boss-Drop Mapping
 # ---------------------------
+
 boss_drops = {
     "Araxxor": ["Noxious pommel", "Noxious point", "Noxious blade", "Araxyte fang", "Araxyte head", "Jar of venom", "Nid"],
     "Barrows": ["Ahrim's hood", "Ahrim's robetop", "Ahrim's robeskirt", "Ahrim's staff", "Karil's coif", "Karil's leathertop", "Karil's leatherskirt", "Karil's crossbow", "Dharok's helm", "Dharok's platebody", "Dharok's platelegs", "Dharok's greataxe", "Guthan's helm", "Guthan's platebody", "Guthan's chainskirt", "Guthan's warspear", "Torag's helm", "Torag's platebody", "Torag's platelegs", "Torag's hammers", "Verac's helm", "Verac's brassard", "Verac's plateskirt", "Verac's flail"],
@@ -562,19 +563,10 @@ async def roll(interaction: discord.Interaction):
 
     records = team_data_sheet.get_all_records()
     rolls_available = 0
-    current_tile = 0
-    team_row_index = -1
-
-    for idx, record in enumerate(records, start=2):
+    for record in records:
         if record.get("Team") == team_name:
             rolls_available = int(record.get("Rolls Available", 0) or 0)
-            current_tile = int(record.get("Position", 0) or 0)
-            team_row_index = idx
             break
-    
-    if team_row_index == -1:
-        await interaction.followup.send(f"❌ Could not find data for **{team_name}**.", ephemeral=True)
-        return
 
     if rolls_available <= 0:
         await interaction.followup.send(
@@ -584,38 +576,7 @@ async def roll(interaction: discord.Interaction):
         return
 
     result = random.randint(1, 6)
-    
-    # Decrement rolls in sheet
-    decrement_rolls_available(team_name) 
-
-    # Calculate new position
-    new_pos = (current_tile + result) % BOARD_SIZE
-    # Handle passing GO (tile 0)
-    if new_pos < current_tile:
-        print(f"ℹ️ {team_name} passed GO.")
-        # Add logic for passing GO if needed
-        pass
-
-    # Update sheet with new position
-    try:
-        headers = team_data_sheet.row_values(1)
-        pos_col_index = headers.index("Position") + 1
-        team_data_sheet.update_cell(team_row_index, pos_col_index, new_pos)
-        print(f"✅ Moved {team_name} to tile {new_pos} (from {current_tile} + roll {result})")
-    except Exception as e:
-        print(f"❌ Error updating position for {team_name}: {e}")
-        await interaction.followup.send("❌ An error occurred while updating your position.", ephemeral=True)
-        return # Don't proceed if move failed
-
-    # Send roll result to channel
-    roll_embed = discord.Embed(
-        title="🎲 Dice Roll 🎲",
-        description=f"**{interaction.user.display_name}** from **{team_name}** rolled a **{result}**!\n\nThey moved from tile `{current_tile}` to tile `{new_pos}`.",
-        color=discord.Color.blue()
-    )
-    await interaction.followup.send(embed=roll_embed)
-    
-    # Log the command (for Godot)
+    await interaction.followup.send(f"🎲 **{interaction.user.display_name}** from **{team_name}** rolled a **{result}**!")
     log_command(
         interaction.user.name,
         "/roll",
@@ -624,20 +585,6 @@ async def roll(interaction: discord.Interaction):
             "roll": result
         }
     )
-
-    # Check for card tiles
-    log_chan = bot.get_channel(LOG_CHANNEL_ID)
-    if not log_chan:
-        print(f"❌ Log channel {LOG_CHANNEL_ID} not found for card draw check.")
-        return
-
-    if new_pos in CHEST_TILES:
-        print(f"ℹ️ {team_name} landed on a Chest tile ({new_pos}).")
-        await team_receives_card(team_name, "Chest", log_chan)
-    elif new_pos in CHANCE_TILES:
-        print(f"ℹ️ {team_name} landed on a Chance tile ({new_pos}).")
-        await team_receives_card(team_name, "Chance", log_chan)
-
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
@@ -937,10 +884,6 @@ async def use_card(interaction: discord.Interaction, index: int):
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     card_row = selected_card['row_index']
     
-    # This log is for your Apps Script, which is now separate
-    # We will log the *effect* instead
-    # log_command(...) 
-    
     stored_roll = None
     final_card_text = selected_card['text']
 
@@ -965,6 +908,7 @@ async def use_card(interaction: discord.Interaction, index: int):
 
         # --- 3. Handle Card Effect ---
         embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
+        log_chan = bot.get_channel(LOG_CHANNEL_ID)
 
         if selected_card['name'] == "Vile Vigour" and stored_roll:
             # Log the new command for Godot
@@ -976,8 +920,39 @@ async def use_card(interaction: discord.Interaction, index: int):
             # Update embed text for confirmation
             embed_description = f"**{team_name}** used **Vile Vigour** and moved **{stored_roll}** spaces forward!"
         
+        elif selected_card['name'] == "Dragon Spear" and stored_roll:
+            move_amount = -int(stored_roll) # Move back
+            
+            # Find all teams on the user's tile
+            all_teams_data = team_data_sheet.get_all_records()
+            user_tile = -1
+            teams_to_move = []
+            
+            for team in all_teams_data:
+                if team.get("Team") == team_name:
+                    user_tile = int(team.get("Position", -1))
+                    break
+            
+            if user_tile != -1:
+                for team in all_teams_data:
+                    team_on_tile = team.get("Team")
+                    if team_on_tile != team_name and int(team.get("Position", -2)) == user_tile:
+                        teams_to_move.append(team_on_tile)
+            
+            if teams_to_move:
+                embed_description = f"**{team_name}** used **Dragon Spear**!\n"
+                for opponent_team in teams_to_move:
+                    log_command(
+                        team_name, # Logged by the user
+                        "/card_effect_move",
+                        {"team": opponent_team, "move": move_amount}
+                    )
+                    embed_description += f"**{opponent_team}** was moved back **{stored_roll}** tiles!\n"
+            else:
+                embed_description = f"**{team_name}** used **Dragon Spear**, but no opponents were on the same tile!"
+
+        
         # --- 4. Send Confirmation Embed ---
-        log_chan = bot.get_channel(LOG_CHANNEL_ID)
         if log_chan:
             embed = discord.Embed(
                 title=f"🃏 Card Played: {selected_card['name']}",
@@ -1004,8 +979,6 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
-
 
 
 
