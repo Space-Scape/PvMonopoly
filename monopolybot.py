@@ -876,11 +876,11 @@ def get_held_cards(sheet_obj, team_name: str):
     return cards
 # ✅ END: Updated 'get_held_cards' function
 
-# ✅ START: New Vengeance Helper Function
+# ✅ START: Vengeance Helper Function
 def check_and_consume_vengeance(target_team_name: str) -> bool:
     """
     Checks if a target team has Vengeance active.
-    If yes, consumes it and returns True.
+    If yes, consumes it (clears wildcard AND held by) and returns True.
     If no, returns False.
     """
     try:
@@ -904,9 +904,18 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
 
         # 2. Check if the target team has it "active"
         if vengeance_wildcard_data.get(target_team_name) == "active":
-            # 3. Consume it (remove from wildcard dict)
+            # 3. Consume it
+            # Remove from wildcard dict
             del vengeance_wildcard_data[target_team_name]
             chance_sheet.update_cell(vengeance_row_index, 4, json.dumps(vengeance_wildcard_data)) # Update Col D
+            
+            # Remove from "Held By"
+            held_by_str = str(chance_sheet.cell(vengeance_row_index, 3).value or "")
+            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+            if target_team_name in teams:
+                teams.remove(target_team_name)
+            chance_sheet.update_cell(vengeance_row_index, 3, ", ".join(teams))
+            
             print(f"✅ Consumed Vengeance for {target_team_name}")
             return True
             
@@ -914,7 +923,7 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
         print(f"❌ Error in check_and_consume_vengeance: {e}")
         
     return False
-# ✅ END: New Vengeance Helper Function
+# ✅ END: Vengeance Helper Function
 
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
@@ -987,6 +996,9 @@ async def use_card(interaction: discord.Interaction, index: int):
     stored_roll = None
     final_card_text = selected_card['text']
     log_chan = bot.get_channel(LOG_CHANNEL_ID)
+    
+    # This boolean will be set to True if the card is a status effect and is NOT consumed
+    is_status_activation = False
 
     try:
         # --- 1. Get Wildcard Data ---
@@ -1005,7 +1017,7 @@ async def use_card(interaction: discord.Interaction, index: int):
         if selected_card['name'] == "Vengeance":
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            # Note: We do NOT remove the team from "Held By"
+            is_status_activation = True # Mark as activation
             
             embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
             if log_chan:
@@ -1016,7 +1028,6 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
-            return # Stop here, card is activated, not "used up"
 
         # --- Vile Vigour ---
         elif selected_card['name'] == "Vile Vigour" and isinstance(team_wildcard_value, int):
@@ -1091,31 +1102,33 @@ async def use_card(interaction: discord.Interaction, index: int):
         else:
             embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
         
-
-        # --- 3. Clear Wildcard Data (if any) ---
-        if team_wildcard_value is not None:
-            wildcard_data.pop(team_name, None) # Remove team's roll/status
-            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            print(f"✅ Cleared wildcard for {team_name} from card {selected_card['name']}")
         
-        # --- 4. Remove Team from "Held By" ---
-        cell_val = str(card_sheet.cell(card_row, 3).value or "")
-        teams = [t.strip() for t in cell_val.split(',') if t.strip()]
-        if team_name in teams:
-            teams.remove(team_name)
-        card_sheet.update_cell(card_row, 3, ", ".join(teams))
+        # --- 3. Clear Data IF NOT a status activation ---
+        if not is_status_activation:
+            # Clear Wildcard Data (if any)
+            if team_wildcard_value is not None:
+                wildcard_data.pop(team_name, None) # Remove team's roll/status
+                card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+                print(f"✅ Cleared wildcard for {team_name} from card {selected_card['name']}")
+            
+            # Remove Team from "Held By"
+            cell_val = str(card_sheet.cell(card_row, 3).value or "")
+            teams = [t.strip() for t in cell_val.split(',') if t.strip()]
+            if team_name in teams:
+                teams.remove(team_name)
+            card_sheet.update_cell(card_row, 3, ", ".join(teams))
+            
+            # --- 4. Send Confirmation Embed ---
+            if log_chan:
+                embed = discord.Embed(
+                    title=f"🃏 Card Played: {selected_card['name']}",
+                    description=embed_description,
+                    color=discord.Color.green()
+                )
+                await log_chan.send(embed=embed)
+            
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
         
-        # --- 5. Send Confirmation Embed ---
-        if log_chan:
-            embed = discord.Embed(
-                title=f"🃏 Card Played: {selected_card['name']}",
-                description=embed_description,
-                color=discord.Color.green()
-            )
-            await log_chan.send(embed=embed)
-        
-        await interaction.followup.send(f"✅ **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
-
     except Exception as e:
         print(f"❌ Error in /use_card: {e}")
         await interaction.followup.send(f"❌ An error occurred while using the card: {e}", ephemeral=True)
