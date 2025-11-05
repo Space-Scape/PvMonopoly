@@ -164,6 +164,40 @@ def decrement_rolls_available(team_name: str):
     except Exception as e:
         print(f"❌ Error decrementing rolls: {e}")
 
+# ✅ NEW: Helper functions for "Used Card This Turn" flag (Column I)
+def get_used_card_flag(team_name: str) -> str:
+    """Checks the 'Used Card This Turn' flag for a team. Defaults to 'no'."""
+    try:
+        records = team_data_sheet.get_all_records()
+        for record in records:
+            if record.get("Team") == team_name:
+                # Use .get() for safety, default to "no"
+                return record.get("Used Card This Turn", "no")
+    except Exception as e:
+        print(f"❌ Error in get_used_card_flag: {e}")
+    return "no" # Default to "no" on error or if not found
+
+def set_used_card_flag(team_name: str, status: str):
+    """Sets the 'Used Card This Turn' flag (Col I) for a team."""
+    try:
+        records = team_data_sheet.get_all_records()
+        headers = team_data_sheet.row_values(1)
+        
+        col_name = "Used Card This Turn"
+        if col_name not in headers:
+            print(f"❌ '{col_name}' column not found in TeamData.")
+            return
+            
+        col_index = headers.index(col_name) + 1 # 1-based index
+
+        for idx, record in enumerate(records, start=2):
+            if record.get("Team") == team_name:
+                team_data_sheet.update_cell(idx, col_index, status)
+                print(f"✅ Set '{col_name}' for {team_name} to '{status}'")
+                return
+    except Exception as e:
+        print(f"❌ Error in set_used_card_flag: {e}")
+
 
 # ======= Modal (for rejection) =======
 class RejectModal(ui.Modal, title="Reject Drop Submission"):
@@ -604,6 +638,12 @@ async def roll(interaction: discord.Interaction):
             ephemeral=True
         )
         return
+        
+    # ✅ NEW: Reset "Used Card This Turn" flag
+    try:
+        set_used_card_flag(team_name, "no")
+    except Exception as e:
+        print(f"❌ Error resetting 'Used Card This Turn' flag for {team_name}: {e}")
 
     result = random.randint(1, 6)
     
@@ -960,6 +1000,67 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
     return False
 # ✅ END: Vengeance Helper Function
 
+# ✅ START: Redemption Helper Function
+def check_and_consume_redemption(target_team_name: str) -> bool:
+    """
+    Checks if a target team has Redemption active.
+    This is a CHEST card.
+    If yes, consumes it (clears wildcard AND held by) and returns True.
+    If no, returns False.
+    """
+    try:
+        # 1. Find the Redemption card in the Chest sheet
+        chest_cards_data = chest_sheet.get_all_values()
+        if not chest_cards_data:
+            return False
+            
+        headers = chest_cards_data[0]
+        name_col = headers.index("Name")
+        held_by_col = headers.index("Held By Team")
+        wildcard_col = headers.index("Wildcard")
+        
+        redemption_row_index = -1
+        redemption_wildcard_data = {}
+        
+        for i, row in enumerate(chest_cards_data[1:], start=2): # Start from row 2
+            if len(row) > name_col and row[name_col] == "Redemption":
+                redemption_row_index = i
+                try:
+                    wildcard_str = row[wildcard_col] or "{}"
+                    redemption_wildcard_data = json.loads(wildcard_str)
+                except:
+                    redemption_wildcard_data = {}
+                break
+        
+        if redemption_row_index == -1:
+            print("ℹ️ Redemption card not found on chest sheet.")
+            return False # Redemption card not found
+
+        # 2. Check if the target team has it "active"
+        team_status = redemption_wildcard_data.get(target_team_name)
+        if team_status and isinstance(team_status, str) and team_status.strip() == "active":
+            # 3. Consume it
+            # Remove from wildcard dict
+            del redemption_wildcard_data[target_team_name]
+            chest_sheet.update_cell(redemption_row_index, wildcard_col + 1, json.dumps(redemption_wildcard_data)) # +1 for 1-based index
+            
+            # Remove from "Held By"
+            held_by_str = str(chest_sheet.cell(redemption_row_index, held_by_col + 1).value or "")
+            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+            if target_team_name in teams:
+                teams.remove(target_team_name)
+            chest_sheet.update_cell(redemption_row_index, held_by_col + 1, ", ".join(teams))
+            
+            print(f"✅ Consumed Redemption for {target_team_name}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error in check_and_consume_redemption: {e}")
+        
+    return False
+# ✅ END: Redemption Helper Function
+
+
 # ✅ START: Alchemy Helper Function
 def check_and_consume_alchemy(team_name: str) -> (int, str):
     """
@@ -1071,7 +1172,7 @@ def clear_all_active_statuses(team_name: str):
                 # ✅ FIXED: Only look for "active"
                 if team_status and isinstance(team_status, str) and team_status.strip() == "active":
                     card_name = row[name_col]
-                    print(f"   > Found active card: {card_name}. Consuming...")
+                    print(f"    > Found active card: {card_name}. Consuming...")
                     
                     # 1. Consume from Wildcard
                     del wildcard_data[found_key]
@@ -1147,6 +1248,15 @@ async def use_card(interaction: discord.Interaction, index: int):
         await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
         return
 
+    # ✅ NEW: Check "Used Card This Turn" flag
+    try:
+        used_card_flag = get_used_card_flag(team_name)
+        if used_card_flag == "yes":
+            await interaction.followup.send("❌ You can only use one card per turn. Roll again to use another card.", ephemeral=True)
+            return
+    except Exception as e:
+        print(f"❌ Error checking used_card_flag: {e}")
+
     # Get cards *with* parsed wildcard text
     chest_cards = get_held_cards(chest_sheet, team_name)
     chance_cards = get_held_cards(chance_sheet, team_name)
@@ -1167,6 +1277,7 @@ async def use_card(interaction: discord.Interaction, index: int):
     
     # This boolean will be set to True if the card is a status effect and is NOT consumed
     is_status_activation = False
+    embed_description = "" # Initialize embed description
 
     try:
         # --- 1. Get Wildcard Data ---
@@ -1206,6 +1317,26 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
+
+        # ✅ NEW: Redemption
+        elif selected_card['name'] == "Redemption":
+            if team_wildcard_value == "active":
+                await interaction.followup.send("❌ This card is already active!", ephemeral=True)
+                return
+            
+            wildcard_data[team_name] = "active"
+            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+            is_status_activation = True # Mark as activation
+            
+            embed_description = f"**{team_name}** used **Redemption**!\n\n> The next negative card effect used on your team will be fizzled."
+            if log_chan:
+                embed = discord.Embed(
+                    title="✨ Card Activated: Redemption",
+                    description=embed_description,
+                    color=discord.Color.from_rgb(255, 255, 204) # Light yellow
+                )
+                await log_chan.send(embed=embed)
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Redemption**!", ephemeral=False)
 
         # --- Low Alchemy ---
         elif selected_card['name'] == "Low Alchemy":
@@ -1290,6 +1421,18 @@ async def use_card(interaction: discord.Interaction, index: int):
             # Log effects and build embed
             embed_description = f"**{team_name}** used **Dragon Spear**!\n\n"
             for target_team in targets:
+                # ✅ NEW REDEMPTION CHECK
+                if check_and_consume_redemption(target_team):
+                    embed_description += f"✨ **{target_team}**'s Redemption fizzled the effect!\n"
+                    if log_chan:
+                        fizzle_embed = discord.Embed(
+                            title="✨ Effect Fizzled!",
+                            description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Redemption** activated and fizzled the effect!",
+                            color=discord.Color.blue()
+                        )
+                        await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
+                    continue # Skip to the next target
+                    
                 # ✅ CHECK FOR VENGEANCE
                 if check_and_consume_vengeance(target_team):
                     # Rebound
@@ -1306,8 +1449,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                             color=discord.Color.dark_red()
                         )
                         await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
-
-                # ✅ REMOVED RETRIBUTION CHECK
+                    continue # Skip to next target
                 
                 else:
                     # Normal effect
@@ -1408,36 +1550,50 @@ async def use_card(interaction: discord.Interaction, index: int):
             target_sheet = stolen_card["sheet"]
             target_row = stolen_card["row_index"]
             
-            # 1. Update "Held By Team"
-            held_by_str = str(target_sheet.cell(target_row, 3).value or "")
-            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
-            if victim_team in teams:
-                teams.remove(victim_team)
-            if team_name not in teams:
-                teams.append(team_name)
-            target_sheet.update_cell(target_row, 3, ", ".join(teams))
-
-            # 2. Transfer Wildcard Data
-            wildcard_str = str(target_sheet.cell(target_row, 4).value or "{}")
-            try:
-                wildcard_data_json = json.loads(wildcard_str)
-                victim_wildcard = wildcard_data_json.pop(victim_team, None)
-                if victim_wildcard:
-                    wildcard_data_json[team_name] = victim_wildcard
-                    target_sheet.update_cell(target_row, 4, json.dumps(wildcard_data_json))
-            except Exception as e:
-                print(f"❌ Error transferring wildcard data: {e}")
-
-            embed_description = f"**{team_name}** used **Rogue's Gloves** and stole **{stolen_card['card_name']}** from **{victim_team}**!"
+            # ✅ NEW REDEMPTION CHECK (on the victim)
+            if check_and_consume_redemption(victim_team):
+                embed_description = f"**{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n✨ But **{victim_team}**'s Redemption fizzled the effect!"
+                if log_chan:
+                    fizzle_embed = discord.Embed(
+                        title="✨ Effect Fizzled!",
+                        description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Redemption** activated and fizzled the effect!",
+                        color=discord.Color.blue()
+                    )
+                    await log_chan.send(content=f"To {victim_team}:", embed=fizzle_embed)
+                # Card is still consumed, but the effect stops here
             
-            # Send a message to the victim
-            if log_chan:
-                victim_embed = discord.Embed(
-                    title="‼️ Card Stolen!",
-                    description=f"**{team_name}** used **Rogue's Gloves** and stole your **{stolen_card['card_name']}** card!",
-                    color=discord.Color.dark_red()
-                )
-                await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
+            else:
+                # --- NO REDEMPTION, PROCEED WITH STEAL ---
+                # 1. Update "Held By Team"
+                held_by_str = str(target_sheet.cell(target_row, 3).value or "")
+                teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+                if victim_team in teams:
+                    teams.remove(victim_team)
+                if team_name not in teams:
+                    teams.append(team_name)
+                target_sheet.update_cell(target_row, 3, ", ".join(teams))
+
+                # 2. Transfer Wildcard Data
+                wildcard_str = str(target_sheet.cell(target_row, 4).value or "{}")
+                try:
+                    wildcard_data_json = json.loads(wildcard_str)
+                    victim_wildcard = wildcard_data_json.pop(victim_team, None)
+                    if victim_wildcard:
+                        wildcard_data_json[team_name] = victim_wildcard
+                        target_sheet.update_cell(target_row, 4, json.dumps(wildcard_data_json))
+                except Exception as e:
+                    print(f"❌ Error transferring wildcard data: {e}")
+
+                embed_description = f"**{team_name}** used **Rogue's Gloves** and stole **{stolen_card['card_name']}** from **{victim_team}**!"
+                
+                # Send a message to the victim
+                if log_chan:
+                    victim_embed = discord.Embed(
+                        title="‼️ Card Stolen!",
+                        description=f"**{team_name}** used **Rogue's Gloves** and stole your **{stolen_card['card_name']}** card!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
 
         # ✅ START: Lure
         elif selected_card['name'] == "Lure":
@@ -1474,13 +1630,25 @@ async def use_card(interaction: discord.Interaction, index: int):
             target_team = sorted_opponents[0][0]
             target_pos = sorted_opponents[0][1]
 
-            # Log the new command
-            log_command(
-                team_name,
-                "/card_effect_set_tile",
-                {"team": target_team, "tile": caster_pos}
-            )
-            embed_description = f"**{team_name}** used **Lure**!\n\n🎣 **{target_team}** (on tile {target_pos}) was lured to your tile (tile {caster_pos})!"
+            # ✅ NEW REDEMPTION CHECK
+            if check_and_consume_redemption(target_team):
+                embed_description = f"**{team_name}** tried to use **Lure** on **{target_team}**...\n\n✨ But **{target_team}**'s Redemption fizzled the effect!"
+                if log_chan:
+                    fizzle_embed = discord.Embed(
+                        title="✨ Effect Fizzled!",
+                        description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated and fizzled the effect!",
+                        color=discord.Color.blue()
+                    )
+                    await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
+            
+            else:
+                # --- NO REDEMPTION, PROCEED WITH LURE ---
+                log_command(
+                    team_name,
+                    "/card_effect_set_tile",
+                    {"team": target_team, "tile": caster_pos}
+                )
+                embed_description = f"**{team_name}** used **Lure**!\n\n🎣 **{target_team}** (on tile {target_pos}) was lured to your tile (tile {caster_pos})!"
         # ✅ END: Lure
 
         # --- Other Cards (default use) ---
@@ -1514,6 +1682,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
         
+        # ✅ NEW: Set "Used Card This Turn" flag
+        # This runs on ANY successful use (activation or consumption)
+        set_used_card_flag(team_name, "yes")
+            
     except Exception as e:
         print(f"❌ Error in /use_card: {e}")
         await interaction.followup.send(f"❌ An error occurred while using the card: {e}", ephemeral=True)
