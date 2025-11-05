@@ -784,7 +784,7 @@ async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attac
 #======================================================================
 # CARD LOGIC
 #======================================================================
-        async def team_receives_card(team_name: str, card_type: str, log_channel):
+async def team_receives_card(team_name: str, card_type: str, log_channel):
     card_sheet = chance_sheet if card_type == "Chance" else chest_sheet
     try:
         rows = card_sheet.get_all_records()
