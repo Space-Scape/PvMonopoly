@@ -784,7 +784,7 @@ async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attac
 #======================================================================
 # CARD LOGIC
 #======================================================================
-async def team_receives_card(team_name: str, card_type: str, log_channel):
+        async def team_receives_card(team_name: str, card_type: str, log_channel):
     card_sheet = chance_sheet if card_type == "Chance" else chest_sheet
     try:
         rows = card_sheet.get_all_records()
@@ -826,6 +826,11 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
                 wildcard_data = {team_name: d6_roll}
                 card_sheet.update_cell(card_row_index, 4, json.dumps(wildcard_data)) # Update Col D
                 print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet")
+            elif "%d3" in card_text: # 🔹 NEW
+                d3_roll = random.randint(1, 3) # 🔹 NEW
+                wildcard_data = {team_name: d3_roll} # 🔹 NEW
+                card_sheet.update_cell(card_row_index, 4, json.dumps(wildcard_data)) # Update Col D # 🔹 NEW
+                print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet") # 🔹 NEW
 
             # Assign card
             card_sheet.update_cell(card_row_index, 3, team_name) # Update Col C
@@ -861,6 +866,20 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
                 wildcard_data[team_name] = d6_roll
                 card_sheet.update_cell(card_row_index, 4, json.dumps(wildcard_data)) # Update Col D
                 print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet")
+
+            elif "%d3" in card_text: # 🔹 NEW
+                d3_roll = random.randint(1, 3) # 🔹 NEW
+                
+                # Get existing wildcard data and add to it
+                try: # 🔹 NEW
+                    wildcard_data_str = card_sheet.cell(card_row_index, 4).value or "{}" # 🔹 NEW
+                    wildcard_data = json.loads(wildcard_data_str) # 🔹 NEW
+                except: # 🔹 NEW
+                    wildcard_data = {} # 🔹 NEW
+                    
+                wildcard_data[team_name] = d3_roll # 🔹 NEW
+                card_sheet.update_cell(card_row_index, 4, json.dumps(wildcard_data)) # Update Col D # 🔹 NEW
+                print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet") # 🔹 NEW
 
             # Add team to "Held By"
             held_by_str = str(card_sheet.cell(card_row_index, 3).value or "")
@@ -1331,7 +1350,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             embed_description = f"**{team_name}** used **Redemption**!\n\n> The next negative card effect used on your team will be fizzled."
             if log_chan:
                 embed = discord.Embed(
-                    title="✨ Card Activated: Redemption",
+                    title="🩵 Card Activated: Redemption",
                     description=embed_description,
                     color=discord.Color.from_rgb(255, 255, 204) # Light yellow
                 )
@@ -1423,11 +1442,11 @@ async def use_card(interaction: discord.Interaction, index: int):
             for target_team in targets:
                 # ✅ NEW REDEMPTION CHECK
                 if check_and_consume_redemption(target_team):
-                    embed_description += f"✨ **{target_team}**'s Redemption fizzled the effect!\n"
+                    embed_description += f"🩵 **{target_team}**'s Redemption activated!\n"
                     if log_chan:
                         fizzle_embed = discord.Embed(
-                            title="✨ Effect Fizzled!",
-                            description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Redemption** activated and fizzled the effect!",
+                            title="🩵 Redemption Activated!",
+                            description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Redemption** activated and activated!",
                             color=discord.Color.blue()
                         )
                         await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
@@ -1552,11 +1571,11 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             # ✅ NEW REDEMPTION CHECK (on the victim)
             if check_and_consume_redemption(victim_team):
-                embed_description = f"**{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n✨ But **{victim_team}**'s Redemption fizzled the effect!"
+                embed_description = f"**{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n🩵 But **{victim_team}**'s Redemption activated!"
                 if log_chan:
                     fizzle_embed = discord.Embed(
-                        title="✨ Effect Fizzled!",
-                        description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Redemption** activated and fizzled the effect!",
+                        title="🩵 Redemption Activated!",
+                        description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Redemption** activated and activated!",
                         color=discord.Color.blue()
                     )
                     await log_chan.send(content=f"To {victim_team}:", embed=fizzle_embed)
@@ -1595,6 +1614,98 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
 
+        # ✅ START: Pickpocket
+        elif selected_card['name'] == "Pickpocket":
+            all_teams_data = team_data_sheet.get_all_records()
+            opponents_gp = []
+
+            caster_row = -1
+            caster_gp = 0
+
+            # Get all team GP
+            for idx, record in enumerate(all_teams_data, start=2):
+                gp = int(record.get("GP", 0) or 0)
+                team = record.get("Team")
+                if team == team_name:
+                    caster_row = idx
+                    caster_gp = gp
+                    continue
+                if team:
+                    opponents_gp.append({"team": team, "gp": gp, "row": idx})
+            
+            if not opponents_gp:
+                await interaction.followup.send("❌ Card effect failed: No other teams found.", ephemeral=True)
+                return # Stop, card is not consumed
+            
+            # Find target with most GP
+            target = max(opponents_gp, key=lambda x: x["gp"])
+            target_team = target["team"]
+            target_gp = target["gp"]
+            target_row = target["row"]
+            
+            steal_amount = 0
+            if target_gp >= 30_000_000:
+                steal_amount = 30_000_000
+            elif target_gp >= 15_000_000:
+                steal_amount = 15_000_000
+            elif target_gp >= 5_000_000:
+                steal_amount = 5_000_000
+            
+            if steal_amount == 0:
+                await interaction.followup.send("❌ Card effect failed: No teams have enough wealth to steal from (min 5M GP).", ephemeral=True)
+                return # Stop, card is not consumed
+
+            embed_description = f"**{team_name}** used **Pickpocket** on **{target_team}**!\n\n"
+
+            # ✅ NEW REDEMPTION CHECK
+            if check_and_consume_redemption(target_team):
+                embed_description += f"🩵 **{target_team}**'s Redemption activated!"
+                if log_chan:
+                    fizzle_embed = discord.Embed(
+                        title="🩵 Redemption Activated!",
+                        description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Redemption** activated!",
+                        color=discord.Color.blue()
+                    )
+                    await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
+            
+            # ✅ CHECK FOR VENGEANCE
+            elif check_and_consume_vengeance(target_team):
+                # Rebound
+                new_caster_gp = max(0, caster_gp - steal_amount)
+                new_target_gp = target_gp + steal_amount # Target GAINS the money
+                
+                team_data_sheet.update_cell(caster_row, 8, new_caster_gp) # GP is Col H (8)
+                team_data_sheet.update_cell(target_row, 8, new_target_gp) # GP is Col H (8)
+
+                embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n**{team_name}** loses **{steal_amount:,} GP**!"
+                if log_chan:
+                    skull_embed = discord.Embed(
+                        title="💀 Vengeance Activated!",
+                        description=f"You activated **{target_team}**'s Vengeance!\nYou lose **{steal_amount:,} GP**!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+
+            else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                new_caster_gp = caster_gp + steal_amount
+                new_target_gp = target_gp - steal_amount
+                
+                team_data_sheet.update_cell(caster_row, 8, new_caster_gp) # GP is Col H (8)
+                team_data_sheet.update_cell(target_row, 8, new_target_gp) # GP is Col H (8)
+
+                embed_description += f"💰 Stole **{steal_amount:,} GP** from **{target_team}**!"
+                
+                # Send message to victim
+                if log_chan:
+                    victim_embed = discord.Embed(
+                        title="‼️ GP Stolen!",
+                        description=f"**{team_name}** used **Pickpocket** and stole **{steal_amount:,} GP** from your team!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {target_team}:", embed=victim_embed)
+        # ✅ END: Pickpocket
+
         # ✅ START: Lure
         elif selected_card['name'] == "Lure":
             # --- PRE-CHECK ---
@@ -1632,11 +1743,11 @@ async def use_card(interaction: discord.Interaction, index: int):
 
             # ✅ NEW REDEMPTION CHECK
             if check_and_consume_redemption(target_team):
-                embed_description = f"**{team_name}** tried to use **Lure** on **{target_team}**...\n\n✨ But **{target_team}**'s Redemption fizzled the effect!"
+                embed_description = f"**{team_name}** tried to use **Lure** on **{target_team}**...\n\n🩵 But **{target_team}**'s Redemption activated!"
                 if log_chan:
                     fizzle_embed = discord.Embed(
-                        title="✨ Effect Fizzled!",
-                        description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated and fizzled the effect!",
+                        title="🩵 Redemption Activated!",
+                        description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated and activated!",
                         color=discord.Color.blue()
                     )
                     await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
@@ -1650,6 +1761,86 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 embed_description = f"**{team_name}** used **Lure**!\n\n🎣 **{target_team}** (on tile {target_pos}) was lured to your tile (tile {caster_pos})!"
         # ✅ END: Lure
+
+        # ✅ START: Backstab
+        elif selected_card['name'] == "Backstab" and isinstance(team_wildcard_value, int):
+            stored_roll = team_wildcard_value
+            
+            # --- PRE-CHECK ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            opponents_ahead = []
+
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    break
+            
+            if caster_pos == -1:
+                await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                return # Stop, card is not consumed
+
+            for record in all_teams_data:
+                opponent_team_name = record.get("Team")
+                if opponent_team_name == team_name:
+                    continue
+                
+                opponent_pos = int(record.get("Position", -1))
+                if opponent_pos > caster_pos:
+                    opponents_ahead.append((opponent_team_name, opponent_pos))
+            
+            if not opponents_ahead:
+                await interaction.followup.send("❌ Card effect failed: No opponents are ahead of you.", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # Find the closest target
+            sorted_opponents = sorted(opponents_ahead, key=lambda x: x[1])
+            target_team = sorted_opponents[0][0]
+            target_pos = sorted_opponents[0][1] # Target's current position
+            
+            # Calculate new position (behind caster)
+            new_pos = max(0, caster_pos - stored_roll)
+
+            embed_description = f"**{team_name}** used **Backstab**!\n\n"
+
+            # ✅ NEW REDEMPTION CHECK
+            if check_and_consume_redemption(target_team):
+                embed_description += f"🩵 **{target_team}**'s Redemption activated!"
+                if log_chan:
+                    fizzle_embed = discord.Embed(
+                        title="🩵 Redemption Activated!",
+                        description=f"**{team_name}** tried to use **Backstab** on you, but your **Redemption** activated!",
+                        color=discord.Color.blue()
+                    )
+                    await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
+            
+            # ✅ CHECK FOR VENGEANCE
+            elif check_and_consume_vengeance(target_team):
+                # Rebound
+                log_command(
+                    team_name, # Logged by the caster
+                    "/card_effect_set_tile",
+                    {"team": team_name, "tile": new_pos} # Move the caster
+                )
+                embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
+                if log_chan:
+                    skull_embed = discord.Embed(
+                        title="💀 Vengeance Activated!",
+                        description=f"You activated **{target_team}**'s Vengeance!\nYour team was moved to tile **{new_pos}**!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+            
+            else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                log_command(
+                    team_name,
+                    "/card_effect_set_tile",
+                    {"team": target_team, "tile": new_pos}
+                )
+                embed_description += f"🔪 **{target_team}** (on tile {target_pos}) was backstabbed to tile {new_pos}!"
+        # ✅ END: Backstab
 
         # --- Other Cards (default use) ---
         else:
