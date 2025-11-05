@@ -1289,18 +1289,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                             description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{stored_roll}** spaces!",
                             color=discord.Color.dark_red()
                         )
-                        await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
-
-                # ✅ REMOVED RETRIBUTION CHECK
-                
-                else:
-                    # Normal effect
-                    log_command(
-                        team_name, # Logged by the caster
-                        "/card_effect_move",
-                        {"team": target_team, "move": move_amount} # Move the target
-                    )
-                    embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
+                        embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
 
         # --- Rogue's Gloves ---
         elif selected_card['name'] == "Rogue's Gloves":
@@ -1422,6 +1411,50 @@ async def use_card(interaction: discord.Interaction, index: int):
                     color=discord.Color.dark_red()
                 )
                 await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
+
+        # ✅ START: Lure
+        elif selected_card['name'] == "Lure":
+            # --- PRE-CHECK ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            opponents_ahead = []
+
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    break
+            
+            if caster_pos == -1:
+                await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                return
+
+            for record in all_teams_data:
+                opponent_team_name = record.get("Team")
+                if opponent_team_name == team_name:
+                    continue
+                
+                opponent_pos = int(record.get("Position", -1))
+                if opponent_pos > caster_pos:
+                    opponents_ahead.append((opponent_team_name, opponent_pos))
+            
+            if not opponents_ahead:
+                await interaction.followup.send("❌ Card effect failed: No opponents are ahead of you.", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # Find the closest target
+            sorted_opponents = sorted(opponents_ahead, key=lambda x: x[1])
+            target_team = sorted_opponents[0][0]
+            target_pos = sorted_opponents[0][1]
+
+            # Log the new command
+            log_command(
+                team_name,
+                "/card_effect_set_tile",
+                {"team": target_team, "tile": caster_pos}
+            )
+            embed_description = f"**{team_name}** used **Lure**!\n\n🎣 **{target_team}** (on tile {target_pos}) was lured to your tile (tile {caster_pos})!"
+        # ✅ END: Lure
 
         # --- Other Cards (default use) ---
         else:
