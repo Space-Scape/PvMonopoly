@@ -1842,6 +1842,145 @@ async def use_card(interaction: discord.Interaction, index: int):
                 embed_description += f"🔪 **{target_team}** (on tile {target_pos}) was backstabbed to tile {new_pos}!"
         # ✅ END: Backstab
 
+        # ✅ START: Smite
+        elif selected_card['name'] == "Smite":
+            # --- PRE-CHECK: Find valid targets ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    break
+            
+            if caster_pos == -1:
+                await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                return # Stop, card is not consumed
+
+            target_tiles = [caster_pos - 1, caster_pos, caster_pos + 1]
+            if caster_pos == 0:
+                target_tiles = [0, 1] # Handle edge case at GO
+
+            valid_targets = []
+            for record in all_teams_data:
+                opponent_team_name = record.get("Team")
+                if opponent_team_name == team_name:
+                    continue
+                
+                opponent_pos = int(record.get("Position", -1))
+                if opponent_pos in target_tiles:
+                    valid_targets.append(opponent_team_name)
+            
+            if not valid_targets:
+                await interaction.followup.send("❌ Card effect failed: No opponents are within 1 tile of you.", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            victim_team = random.choice(valid_targets)
+            embed_description = f"**{team_name}** used **Smite** on **{victim_team}**!\n\n"
+
+            # --- PRE-CHECK 2: Find victim's cards ---
+            victim_chest_cards = get_held_cards(chest_sheet, victim_team)
+            victim_chance_cards = get_held_cards(chance_sheet, victim_team)
+            all_victim_cards = victim_chest_cards + victim_chance_cards
+            
+            non_active_cards = [card for card in all_victim_cards if "(ACTIVE)" not in card['text']]
+            
+            if not non_active_cards:
+                await interaction.followup.send(f"❌ Card effect failed: **{victim_team}** has no cards that can be removed.", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK 2 ---
+
+            # ✅ NEW REDEMPTION CHECK
+            if check_and_consume_redemption(victim_team):
+                embed_description += f"🩵 **{victim_team}**'s Redemption activated!"
+                if log_chan:
+                    fizzle_embed = discord.Embed(
+                        title="🩵 Redemption Activated!",
+                        description=f"**{team_name}** tried to use **Smite** on you, but your **Redemption** activated!",
+                        color=discord.Color.blue()
+                    )
+                    await log_chan.send(content=f"To {victim_team}:", embed=fizzle_embed)
+            
+            # ✅ CHECK FOR VENGEANCE
+            elif check_and_consume_vengeance(victim_team):
+                embed_description += f"💀 **{victim_team}** had Vengeance! The effect was rebounded!\n"
+                
+                # Find a card from the caster to remove
+                caster_chest_cards = get_held_cards(chest_sheet, team_name)
+                caster_chance_cards = get_held_cards(chance_sheet, team_name)
+                all_caster_cards = caster_chest_cards + caster_chance_cards
+                non_active_caster_cards = [card for card in all_caster_cards if "(ACTIVE)" not in card['text']]
+                
+                if not non_active_caster_cards:
+                    embed_description += f"But **{team_name}** had no cards to lose!"
+                else:
+                    card_to_remove = random.choice(non_active_caster_cards)
+                    remove_sheet = chest_sheet if card_to_remove in caster_chest_cards else chance_sheet
+                    remove_row = card_to_remove['row_index']
+                    
+                    # Remove card from caster
+                    # 1. Clear Wildcard
+                    wildcard_str = str(remove_sheet.cell(remove_row, 4).value or "{}")
+                    try:
+                        wildcard_data = json.loads(wildcard_str)
+                        wildcard_data.pop(team_name, None)
+                        remove_sheet.update_cell(remove_row, 4, json.dumps(wildcard_data))
+                    except Exception as e:
+                        print(f"❌ Error clearing wildcard on Vengeance Smite: {e}")
+                        
+                    # 2. Clear "Held By"
+                    held_by_str = str(remove_sheet.cell(remove_row, 3).value or "")
+                    teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+                    if team_name in teams:
+                        teams.remove(team_name)
+                    remove_sheet.update_cell(remove_row, 3, ", ".join(teams))
+                    
+                    embed_description += f"**{team_name}** lost their **{card_to_remove['name']}** card!"
+                    
+                    if log_chan:
+                        skull_embed = discord.Embed(
+                            title="💀 Vengeance Activated!",
+                            description=f"You activated **{victim_team}**'s Vengeance!\nYou lost your **{card_to_remove['name']}** card!",
+                            color=discord.Color.dark_red()
+                        )
+                        await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+
+            else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                card_to_remove = random.choice(non_active_cards)
+                remove_sheet = chest_sheet if card_to_remove in victim_chest_cards else chance_sheet
+                remove_row = card_to_remove['row_index']
+
+                # Remove card from victim
+                # 1. Clear Wildcard
+                wildcard_str = str(remove_sheet.cell(remove_row, 4).value or "{}")
+                try:
+                    wildcard_data = json.loads(wildcard_str)
+                    wildcard_data.pop(victim_team, None)
+                    remove_sheet.update_cell(remove_row, 4, json.dumps(wildcard_data))
+                except Exception as e:
+                    print(f"❌ Error clearing wildcard on Smite: {e}")
+                    
+                # 2. Clear "Held By"
+                held_by_str = str(remove_sheet.cell(remove_row, 3).value or "")
+                teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+                if victim_team in teams:
+                    teams.remove(victim_team)
+                remove_sheet.update_cell(remove_row, 3, ", ".join(teams))
+
+                embed_description += f"🌩️ **{victim_team}** was smote and lost their **{card_to_remove['name']}** card!"
+                
+                # Send message to victim
+                if log_chan:
+                    victim_embed = discord.Embed(
+                        title="‼️ Card Lost!",
+                        description=f"**{team_name}** used **Smite**! Your team lost your **{card_to_remove['name']}** card!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
+        # ✅ END: Smite
+
         # --- Other Cards (default use) ---
         else:
             embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
