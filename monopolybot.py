@@ -36,7 +36,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ========== GOOGLE SHEETS SETUP ==========
 scope = [
-    "https.spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
