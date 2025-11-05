@@ -36,7 +36,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ========== GOOGLE SHEETS SETUP ==========
 scope = [
-    "https://spreadsheets.google.com/feeds",
+    "https.spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
@@ -881,8 +881,8 @@ def get_held_cards(sheet_obj, team_name: str):
                         if stored_val:
                             if isinstance(stored_val, int): # It's a number
                                 card_text = card_text.replace("%d6", str(stored_val))
-                            # ✅ FIXED: check for all active statuses
-                            elif isinstance(stored_val, str) and stored_val.strip() in ("active", "low_alchemy", "high_alchemy"): 
+                            # ✅ FIXED: ONLY look for "active"
+                            elif isinstance(stored_val, str) and stored_val.strip() == "active": 
                                 card_text += " **(ACTIVE)**"
                                 
                     except Exception as e:
@@ -1000,9 +1000,9 @@ def check_and_consume_alchemy(team_name: str) -> (int, str):
                     found_key = key
                     break
             
-            # Check for "low_alchemy" or "high_alchemy" status
-            if team_status and isinstance(team_status, str) and team_status.strip() in ("low_alchemy", "high_alchemy"):
-                multiplier = 3 if team_status.strip() == "high_alchemy" else 2
+            # ✅ FIXED: Check for "active" status, then check card name
+            if team_status and isinstance(team_status, str) and team_status.strip() == "active":
+                multiplier = 3 if card_name == "High Alchemy" else 2
                 
                 # Consume the card
                 # Remove from wildcard dict
@@ -1051,7 +1051,7 @@ def clear_all_active_statuses(team_name: str):
                     continue
                 
                 wildcard_str = str(row[wildcard_col] or "{}")
-                if "active" not in wildcard_str and "alchemy" not in wildcard_str:
+                if "active" not in wildcard_str: # ✅ FIXED: Only look for "active"
                     continue # Skip if the wildcard cell doesn't have a status
 
                 try:
@@ -1068,7 +1068,8 @@ def clear_all_active_statuses(team_name: str):
                         break
                 
                 # If an active status is found for this team
-                if team_status and isinstance(team_status, str) and team_status.strip() in ("active", "low_alchemy", "high_alchemy"):
+                # ✅ FIXED: Only look for "active"
+                if team_status and isinstance(team_status, str) and team_status.strip() == "active":
                     card_name = row[name_col]
                     print(f"   > Found active card: {card_name}. Consuming...")
                     
@@ -1187,6 +1188,11 @@ async def use_card(interaction: discord.Interaction, index: int):
         
         # --- Vengeance ---
         if selected_card['name'] == "Vengeance":
+            # ✅ FIXED: Check if already active
+            if team_wildcard_value == "active":
+                await interaction.followup.send("❌ This card is already active!", ephemeral=True)
+                return
+            
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
             is_status_activation = True # Mark as activation
@@ -1203,7 +1209,12 @@ async def use_card(interaction: discord.Interaction, index: int):
 
         # --- Low Alchemy ---
         elif selected_card['name'] == "Low Alchemy":
-            wildcard_data[team_name] = "low_alchemy"
+            # ✅ FIXED: Check if already active
+            if team_wildcard_value == "active":
+                await interaction.followup.send("❌ This card is already active!", ephemeral=True)
+                return
+
+            wildcard_data[team_name] = "active" # ✅ FIXED: Store "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
             is_status_activation = True # Mark as activation
             
@@ -1219,7 +1230,12 @@ async def use_card(interaction: discord.Interaction, index: int):
 
         # --- High Alchemy ---
         elif selected_card['name'] == "High Alchemy":
-            wildcard_data[team_name] = "high_alchemy"
+            # ✅ FIXED: Check if already active
+            if team_wildcard_value == "active":
+                await interaction.followup.send("❌ This card is already active!", ephemeral=True)
+                return
+                
+            wildcard_data[team_name] = "active" # ✅ FIXED: Store "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
             is_status_activation = True # Mark as activation
             
@@ -1289,7 +1305,18 @@ async def use_card(interaction: discord.Interaction, index: int):
                             description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{stored_roll}** spaces!",
                             color=discord.Color.dark_red()
                         )
-                        embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
+                        await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+
+                # ✅ REMOVED RETRIBUTION CHECK
+                
+                else:
+                    # Normal effect
+                    log_command(
+                        team_name, # Logged by the caster
+                        "/card_effect_move",
+                        {"team": target_team, "move": move_amount} # Move the target
+                    )
+                    embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
 
         # --- Rogue's Gloves ---
         elif selected_card['name'] == "Rogue's Gloves":
@@ -1317,7 +1344,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                                 wildcard_data_json = json.loads(wildcard_str)
                                 victim_team = held_by_str.strip() 
                                 victim_status = wildcard_data_json.get(victim_team)
-                                if victim_status and isinstance(victim_status, str) and victim_status.strip() in ("active", "low_alchemy", "high_alchemy"):
+                                if victim_status and isinstance(victim_status, str) and victim_status.strip() == "active":
                                     is_active = True
                             except:
                                 pass 
@@ -1355,9 +1382,9 @@ async def use_card(interaction: discord.Interaction, index: int):
 
                         valid_victims = []
                         for holder in all_holders:
-                            if holder == team_name: continue # Should be redundant, but safe
+                            if holder == team_name: continue
                             holder_status = wildcard_data_json.get(holder)
-                            if not (holder_status and isinstance(holder_status, str) and holder_status.strip() in ("active", "low_alchemy", "high_alchemy")):
+                            if not (holder_status and isinstance(holder_status, str) and holder_status.strip() == "active"):
                                 valid_victims.append(holder)
 
                         if valid_victims:
