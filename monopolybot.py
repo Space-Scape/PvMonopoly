@@ -423,7 +423,7 @@ class DropReviewButtons(ui.View):
                         increment_rolls_available(team_name)
                         print(f"✅ Roll granted: Team {team_name} on tile {current_tile} ({self.boss})")
                     else:
-                        print(f"ℹ️ No roll granted: Team {team_name} on tile {current_tile}, drop boss {self.boss} not valid here.")
+                        print(f"❗ No roll granted: Team {team_name} on tile {current_tile}, drop boss {self.boss} not valid here.")
                 except Exception as e:
                     print(f"❌ Error checking tile before granting roll: {e}")
 
@@ -691,10 +691,10 @@ async def roll(interaction: discord.Interaction):
         return
 
     if new_pos in CHEST_TILES:
-        print(f"ℹ️ {team_name} landed on CHEST tile {new_pos}")
+        print(f"❗ {team_name} landed on CHEST tile {new_pos}")
         await team_receives_card(team_name, "Chest", log_chan)
     elif new_pos in CHANCE_TILES:
-        print(f"ℹ️ {team_name} landed on CHANCE tile {new_pos}")
+        print(f"❗ {team_name} landed on CHANCE tile {new_pos}")
         await team_receives_card(team_name, "Chance", log_chan)
 
 
@@ -794,17 +794,8 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
 
         # ✅ START: Logic for Chance Card (one per team)
         if card_type == "Chance":
-            already_holds_card = False
-            for row in rows:
-                held_by = str(row.get("Held By Team", ""))
-                if team_name in held_by:
-                    already_holds_card = True
-                    break
+            # ❌ REMOVED the 'already_holds_card' check that was blocking teams.
             
-            if already_holds_card:
-                await log_channel.send(f"ℹ️ **{team_name}** landed on a Chance tile but they are already holding a card.")
-                return
-
             eligible_cards = []
             for i, row in enumerate(rows, start=2):
                 held_by = str(row.get("Held By Team", ""))
@@ -812,7 +803,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                await log_channel.send(f"ℹ️ **{team_name}** tried to draw a Chance card, but none were available!")
+                await log_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
                 return
                 
             chosen_card = random.choice(eligible_cards)
@@ -844,7 +835,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                await log_chan.send(f"ℹ️ **{team_name}** tried to draw a {card_type} card, but none were available!")
+                await log_chan.send(f"❗ **{team_name}** tried to draw a {card_type} card, but none were available!")
                 return
 
             chosen_card = random.choice(eligible_cards)
@@ -940,6 +931,7 @@ def get_held_cards(sheet_obj, team_name: str):
                         if stored_val:
                             if isinstance(stored_val, int): # It's a number
                                 card_text = card_text.replace("%d6", str(stored_val))
+                                card_text = card_text.replace("%d3", str(stored_val)) # 🔹 NEW
                             # ✅ FIXED: ONLY look for "active"
                             elif isinstance(stored_val, str) and stored_val.strip() == "active": 
                                 card_text += " **(ACTIVE)**"
@@ -991,7 +983,7 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
                 break
         
         if vengeance_row_index == -1:
-            print("ℹ️ Vengeance card not found on sheet.")
+            print("❗ Vengeance card not found on sheet.")
             return False # Vengeance card not found
 
         # 2. Check if the target team has it "active"
@@ -1052,7 +1044,7 @@ def check_and_consume_redemption(target_team_name: str) -> bool:
                 break
         
         if redemption_row_index == -1:
-            print("ℹ️ Redemption card not found on chance sheet.")
+            print("❗ Redemption card not found on chance sheet.")
             return False # Redemption card not found
 
         # 2. Check if the target team has it "active"
@@ -1078,6 +1070,67 @@ def check_and_consume_redemption(target_team_name: str) -> bool:
         
     return False
 # ✅ END: Redemption Helper Function
+
+
+# ✅ START: Elder Maul Helper Function
+def check_and_consume_elder_maul(target_team_name: str) -> bool:
+    """
+    Checks if a target team has Elder Maul active.
+    This is a CHANCE card.
+    If yes, consumes it (clears wildcard AND held by) and returns True.
+    If no, returns False.
+    """
+    try:
+        # 1. Find the Elder Maul card in the Chance sheet
+        chance_cards_data = chance_sheet.get_all_values()
+        if not chance_cards_data:
+            return False
+            
+        headers = chance_cards_data[0]
+        name_col = headers.index("Name")
+        held_by_col = headers.index("Held By Team")
+        wildcard_col = headers.index("Wildcard")
+        
+        card_row_index = -1
+        card_wildcard_data = {}
+        
+        for i, row in enumerate(chance_cards_data[1:], start=2): # Start from row 2
+            if len(row) > name_col and row[name_col] == "Elder Maul":
+                card_row_index = i
+                try:
+                    wildcard_str = row[wildcard_col] or "{}"
+                    card_wildcard_data = json.loads(wildcard_str)
+                except:
+                    card_wildcard_data = {}
+                break
+        
+        if card_row_index == -1:
+            print("❗ Elder Maul card not found on chance sheet.")
+            return False # Card not found
+
+        # 2. Check if the target team has it "active"
+        team_status = card_wildcard_data.get(target_team_name)
+        if team_status and isinstance(team_status, str) and team_status.strip() == "active":
+            # 3. Consume it
+            # Remove from wildcard dict
+            del card_wildcard_data[target_team_name]
+            chance_sheet.update_cell(card_row_index, wildcard_col + 1, json.dumps(card_wildcard_data)) # +1 for 1-based index
+            
+            # Remove from "Held By"
+            held_by_str = str(chance_sheet.cell(card_row_index, held_by_col + 1).value or "")
+            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+            if target_team_name in teams:
+                teams.remove(target_team_name)
+            chance_sheet.update_cell(card_row_index, held_by_col + 1, ", ".join(teams))
+            
+            print(f"✅ Consumed Elder Maul for {target_team_name}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error in check_and_consume_elder_maul: {e}")
+        
+    return False
+# ✅ END: Elder Maul Helper Function
 
 
 # ✅ START: Alchemy Helper Function
@@ -1151,7 +1204,7 @@ def clear_all_active_statuses(team_name: str):
     Finds and clears all "active" statuses for a given team
     from both card sheets. This is called at the start of a team's turn.
     """
-    print(f"ℹ️ Clearing all active statuses for {team_name}...")
+    print(f"❗ Clearing all active statuses for {team_name}...")
     sheets_to_check = [chance_sheet, chest_sheet]
     cards_cleared = []
 
@@ -1218,10 +1271,10 @@ async def check_and_award_card_on_land(team_name: str, new_pos: int, log_channel
     Checks if a new position is a card tile and awards a card if it is.
     """
     if new_pos in CHEST_TILES:
-        print(f"ℹ️ {team_name} is {reason} CHEST tile {new_pos}")
+        print(f"❗ {team_name} is {reason} CHEST tile {new_pos}")
         await team_receives_card(team_name, "Chest", log_channel)
     elif new_pos in CHANCE_TILES:
-        print(f"ℹ️ {team_name} is {reason} CHANCE tile {new_pos}")
+        print(f"❗ {team_name} is {reason} CHANCE tile {new_pos}")
         await team_receives_card(team_name, "Chance", log_channel)
 # ✅ END: New Helper
 
@@ -1343,7 +1396,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
             if log_chan:
                 embed = discord.Embed(
-                    title="🛡️ Card Activated: Vengeance",
+                    title="💀 Card Activated: Vengeance",
                     description=embed_description,
                     color=discord.Color.from_rgb(172, 172, 172) # Silver
                 )
@@ -1369,6 +1422,26 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Redemption**!", ephemeral=False)
+
+        # ✅ NEW: Elder Maul
+        elif selected_card['name'] == "Elder Maul":
+            if team_wildcard_value == "active":
+                await interaction.followup.send("❌ This card is already active!", ephemeral=True)
+                return
+            
+            wildcard_data[team_name] = "active"
+            card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
+            is_status_activation = True # Mark as activation
+            
+            embed_description = f"**{team_name}** used **Elder Maul**!\n\n> The next negative card effect used on your team will be reduced."
+            if log_chan:
+                embed = discord.Embed(
+                    title="🛡️ Card Activated: Elder Maul",
+                    description=embed_description,
+                    color=discord.Color.light_grey()
+                )
+                await log_chan.send(embed=embed)
+            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Elder Maul**!", ephemeral=False)
 
         # --- Low Alchemy ---
         elif selected_card['name'] == "Low Alchemy":
@@ -1487,15 +1560,30 @@ async def use_card(interaction: discord.Interaction, index: int):
                         )
                         await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
                     continue # Skip to the next target
-                    
+                        
                 # ✅ CHECK FOR VENGEANCE
                 if check_and_consume_vengeance(target_team):
                     # Rebound
-                    new_pos = max(0, caster_pos + move_amount) # Calculate new_pos for caster
+                    
+                    # ✅ NEW ELDER MAUL CHECK (on caster)
+                    elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
+                    final_move_amount = move_amount # This is -stored_roll
+                    if elder_maul_active:
+                        final_move_amount = -(max(0, stored_roll - 1))
+                        embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded effect reduced.\n"
+                        if log_chan:
+                            maul_embed = discord.Embed(
+                                title="🛡️ Elder Maul Activated!",
+                                description=f"Your **Elder Maul** activated and reduced the Vengeance effect!",
+                                color=discord.Color.light_grey()
+                            )
+                            await log_chan.send(content=f"To {team_name}:", embed=maul_embed) # Send to caster
+                    
+                    new_pos = max(0, caster_pos + final_move_amount) # Calculate new_pos for caster
                     log_command(
                         team_name, # Logged by the caster
                         "/card_effect_move",
-                        {"team": team_name, "move": move_amount} # Move the caster
+                        {"team": team_name, "move": final_move_amount} # Move the caster
                     )
                     embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
                     
@@ -1505,7 +1593,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     if log_chan:
                         skull_embed = discord.Embed(
                             title="💀 Vengeance Activated!",
-                            description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{stored_roll}** spaces!",
+                            description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{abs(final_move_amount)}** spaces!",
                             color=discord.Color.dark_red()
                         )
                         await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
@@ -1513,16 +1601,34 @@ async def use_card(interaction: discord.Interaction, index: int):
                 
                 else:
                     # Normal effect
-                    new_pos = max(0, caster_pos + move_amount) # Calculate new_pos
+                    
+                    # ✅ NEW ELDER MAUL CHECK
+                    elder_maul_active = check_and_consume_elder_maul(target_team)
+                    final_move_amount = move_amount # This is -stored_roll
+                    if elder_maul_active:
+                        final_move_amount = -(max(0, stored_roll - 1)) # e.g., -3 (roll=3) becomes -2. -1 (roll=1) becomes 0.
+                        embed_description += f"🛡️ **{target_team}**'s Elder Maul activated! Effect reduced.\n"
+                        if log_chan:
+                            maul_embed = discord.Embed(
+                                title="🛡️ Elder Maul Activated!",
+                                description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Elder Maul** reduced the effect!",
+                                color=discord.Color.light_grey()
+                            )
+                            await log_chan.send(content=f"To {target_team}:", embed=maul_embed)
+
+                    # Get target's current pos (which is same as caster_pos)
+                    target_pos = caster_pos 
+                    new_pos = max(0, target_pos + final_move_amount) # Calculate new_pos
                     log_command(
                         team_name, # Logged by the caster
                         "/card_effect_move",
-                        {"team": target_team, "move": move_amount} # Move the target
+                        {"team": target_team, "move": final_move_amount} # Move the target
                     )
-                    embed_description += f"**{target_team}** was moved back **{stored_roll}** tiles (stops at Go)!\n"
+                    embed_description += f"**{target_team}** was moved back **{abs(final_move_amount)}** tiles (stops at Go)!\n"
                     
                     # 🔹 ADDED: Check for card 🔹
                     await check_and_award_card_on_land(target_team, new_pos, log_chan, "being hit by Dragon Spear to")
+
 
         # --- Rogue's Gloves ---
         elif selected_card['name'] == "Rogue's Gloves":
@@ -1716,36 +1822,66 @@ async def use_card(interaction: discord.Interaction, index: int):
             # ✅ CHECK FOR VENGEANCE
             elif check_and_consume_vengeance(target_team):
                 # Rebound
-                new_caster_gp = max(0, caster_gp - steal_amount)
-                new_target_gp = target_gp + steal_amount # Target GAINS the money
+                
+                # ✅ NEW ELDER MAUL CHECK (on the *caster* this time)
+                elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
+                final_steal_amount = steal_amount
+                if elder_maul_active:
+                    final_steal_amount = steal_amount // 2 # Halved
+                    embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded loss halved.\n"
+                    if log_chan:
+                        maul_embed = discord.Embed(
+                            title="🛡️ Elder Maul Activated!",
+                            description=f"Your **Elder Maul** activated and halved the GP you lost from Vengeance!",
+                            color=discord.Color.light_grey()
+                        )
+                        await log_chan.send(content=f"To {team_name}:", embed=maul_embed) # Send to caster
+                
+                new_caster_gp = max(0, caster_gp - final_steal_amount)
+                new_target_gp = target_gp + final_steal_amount # Target GAINS the money
                 
                 team_data_sheet.update_cell(caster_row, 8, new_caster_gp) # GP is Col H (8)
                 team_data_sheet.update_cell(target_row, 8, new_target_gp) # GP is Col H (8)
 
-                embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n**{team_name}** loses **{steal_amount:,} GP**!"
+                embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n**{team_name}** loses **{final_steal_amount:,} GP**!"
                 if log_chan:
                     skull_embed = discord.Embed(
                         title="💀 Vengeance Activated!",
-                        description=f"You activated **{target_team}**'s Vengeance!\nYou lose **{steal_amount:,} GP**!",
+                        description=f"You activated **{target_team}**'s Vengeance!\nYou lose **{final_steal_amount:,} GP**!",
                         color=discord.Color.dark_red()
                     )
                     await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
 
             else:
                 # --- NO REDEMPTION/VENGEANCE, PROCEED ---
-                new_caster_gp = caster_gp + steal_amount
-                new_target_gp = target_gp - steal_amount
+                
+                # ✅ NEW ELDER MAUL CHECK
+                elder_maul_active = check_and_consume_elder_maul(target_team)
+                final_steal_amount = steal_amount
+                if elder_maul_active:
+                    final_steal_amount = steal_amount // 2 # Halved
+                    embed_description += f"🛡️ **{target_team}**'s Elder Maul activated! Steal amount halved.\n"
+                    if log_chan:
+                        maul_embed = discord.Embed(
+                            title="🛡️ Elder Maul Activated!",
+                            description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Elder Maul** reduced the amount stolen!",
+                            color=discord.Color.light_grey()
+                        )
+                        await log_chan.send(content=f"To {target_team}:", embed=maul_embed)
+                
+                new_caster_gp = caster_gp + final_steal_amount
+                new_target_gp = target_gp - final_steal_amount
                 
                 team_data_sheet.update_cell(caster_row, 8, new_caster_gp) # GP is Col H (8)
                 team_data_sheet.update_cell(target_row, 8, new_target_gp) # GP is Col H (8)
 
-                embed_description += f"💰 Stole **{steal_amount:,} GP** from **{target_team}**!"
+                embed_description += f"💰 Stole **{final_steal_amount:,} GP** from **{target_team}**!"
                 
                 # Send message to victim
                 if log_chan:
                     victim_embed = discord.Embed(
                         title="‼️ GP Stolen!",
-                        description=f"**{team_name}** used **Pickpocket** and stole **{steal_amount:,} GP** from your team!",
+                        description=f"**{team_name}** used **Pickpocket** and stole **{final_steal_amount:,} GP** from your team!",
                         color=discord.Color.dark_red()
                     )
                     await log_chan.send(content=f"To {target_team}:", embed=victim_embed)
@@ -1847,9 +1983,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             target_team = sorted_opponents[0][0]
             target_pos = sorted_opponents[0][1] # Target's current position
             
-            # Calculate new position (behind caster)
-            new_pos = max(0, caster_pos - stored_roll)
-
             embed_description = f"**{team_name}** used **Backstab**!\n\n"
 
             # ✅ NEW REDEMPTION CHECK
@@ -1866,6 +1999,24 @@ async def use_card(interaction: discord.Interaction, index: int):
             # ✅ CHECK FOR VENGEANCE
             elif check_and_consume_vengeance(target_team):
                 # Rebound
+                
+                # ✅ NEW ELDER MAUL CHECK (on caster)
+                elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
+                final_roll_val = stored_roll
+                if elder_maul_active:
+                    final_roll_val = max(0, stored_roll - 1)
+                    embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded effect reduced.\n"
+                    if log_chan:
+                        maul_embed = discord.Embed(
+                            title="🛡️ Elder Maul Activated!",
+                            description=f"Your **Elder Maul** activated and reduced the Vengeance effect!",
+                            color=discord.Color.light_grey()
+                        )
+                        await log_chan.send(content=f"To {team_name}:", embed=maul_embed) # Send to caster
+                
+                # Calculate new position (behind caster)
+                new_pos = max(0, caster_pos - final_roll_val)
+                
                 log_command(
                     team_name, # Logged by the caster
                     "/card_effect_set_tile",
@@ -1886,6 +2037,24 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             else:
                 # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                
+                # ✅ NEW ELDER MAUL CHECK
+                elder_maul_active = check_and_consume_elder_maul(target_team)
+                final_roll_val = stored_roll # This is the positive roll value
+                if elder_maul_active:
+                    final_roll_val = max(0, stored_roll - 1)
+                    embed_description += f"🛡️ **{target_team}**'s Elder Maul activated! Effect reduced.\n"
+                    if log_chan:
+                        maul_embed = discord.Embed(
+                            title="🛡️ Elder Maul Activated!",
+                            description=f"**{team_name}** tried to use **Backstab** on you, but your **Elder Maul** reduced the effect!",
+                            color=discord.Color.light_grey()
+                        )
+                        await log_chan.send(content=f"To {target_team}:", embed=maul_embed)
+
+                # Calculate new position (behind caster)
+                new_pos = max(0, caster_pos - final_roll_val)
+                
                 log_command(
                     team_name,
                     "/card_effect_set_tile",
@@ -2003,6 +2172,9 @@ async def use_card(interaction: discord.Interaction, index: int):
 
             else:
                 # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                
+                # NOTE: Elder Maul does not block Smite, as Smite is not a "reduced" effect.
+                
                 card_to_remove = random.choice(non_active_cards)
                 remove_sheet = chest_sheet if card_to_remove in victim_chest_cards else chance_sheet
                 remove_row = card_to_remove['row_index']
