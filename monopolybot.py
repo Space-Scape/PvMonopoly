@@ -835,7 +835,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                await log_chan.send(f"❗ **{team_name}** tried to draw a {card_type} card, but none were available!")
+                await log_channel.send(f"❗ **{team_name}** tried to draw a {card_type} card, but none were available!")
                 return
 
             chosen_card = random.choice(eligible_cards)
@@ -1244,7 +1244,7 @@ def clear_all_active_statuses(team_name: str):
                 # ✅ FIXED: Only look for "active"
                 if team_status and isinstance(team_status, str) and team_status.strip() == "active":
                     card_name = row[name_col]
-                    print(f"    > Found active card: {card_name}. Consuming...")
+                    print(f"     > Found active card: {card_name}. Consuming...")
                     
                     # 1. Consume from Wildcard
                     del wildcard_data[found_key]
@@ -1303,9 +1303,9 @@ async def show_cards(interaction: discord.Interaction):
 
     # 🟣 Add Chest Cards
     if chest_cards:
-        for i, card in enumerate(chest_cards):
+        for i, card in enumerate(chest_cards, start=1):
             embed.add_field(
-                name=f"🟡 [{i}] Chest Card — {card['name']}",
+                name=f"<:purp:1406234308749824051> [{i}] Chest Card — {card['name']}",
                 value=f"```{card['text']}```",
                 inline=False
             )
@@ -1313,9 +1313,9 @@ async def show_cards(interaction: discord.Interaction):
     # 🔵 Add Chance Cards
     offset = len(chest_cards)
     if chance_cards:
-        for i, card in enumerate(chance_cards):
+        for i, card in enumerate(chance_cards, start=1):
             embed.add_field(
-                name=f"🔵 [{i+offset}] Chance Card — {card['name']}",
+                name=f"<:questioning:1287623035381350441> [{i+offset}] Chance Card — {card['name']}",
                 value=f"```{card['text']}```",
                 inline=False
             )
@@ -1325,7 +1325,7 @@ async def show_cards(interaction: discord.Interaction):
 
 # ✅ START: Updated 'use_card' command
 @bot.tree.command(name="use_card", description="Use a held card by its index from /show_cards")
-@app_commands.describe(index="The index of the card you want to use")
+@app_commands.describe(index="The index of the card you want to use (starts at 1)")
 async def use_card(interaction: discord.Interaction, index: int):
     await interaction.response.defer(ephemeral=False) 
     team_name = get_team(interaction.user)
@@ -1347,12 +1347,12 @@ async def use_card(interaction: discord.Interaction, index: int):
     chance_cards = get_held_cards(chance_sheet, team_name)
     all_cards = chest_cards + chance_cards
 
-    if index < 0 or index >= len(all_cards):
-        await interaction.followup.send("❌ Invalid card index.", ephemeral=True)
+    if index < 1 or index > len(all_cards):
+        await interaction.followup.send(f"❌ Invalid card index. Use `/show_cards` and pick a number between 1 and {len(all_cards)}.", ephemeral=True)
         return
     
-    selected_card = all_cards[index]
-    card_type = "Chest" if index < len(chest_cards) else "Chance"
+    selected_card = all_cards[index - 1] # Convert 1-based index to 0-based
+    card_type = "Chest" if (index - 1) < len(chest_cards) else "Chance"
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     card_row = selected_card['row_index']
     
@@ -1945,6 +1945,26 @@ async def use_card(interaction: discord.Interaction, index: int):
                 # 🔹 ADDED: Check for card 🔹
                 await check_and_award_card_on_land(target_team, caster_pos, log_chan, "being lured to")
         # ✅ END: Lure
+
+        # 🔹 START: Escape Crystal
+        elif selected_card['name'] == "Escape Crystal":
+            # --- PRE-CHECK: Get caster position ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    break
+            
+            if caster_pos != 10:
+                await interaction.followup.send("❌ You can only use the **Escape Crystal** on tile 10 (Nex/Gauntlet).", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # Card effect is valid
+            increment_rolls_available(team_name)
+            embed_description = f"**{team_name}** used the **Escape Crystal** on tile 10!\n\n> 🎲 You have gained a free roll!"
+        # 🔹 END: Escape Crystal
 
         # ✅ START: Backstab
         elif selected_card['name'] == "Backstab" and isinstance(team_wildcard_value, int):
