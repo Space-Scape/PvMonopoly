@@ -63,6 +63,8 @@ chest_sheet = sheet.worksheet("ChestCards")
 chance_sheet = sheet.worksheet("ChanceCards")
 drop_log_sheet = sheet.worksheet("DropLog")
 item_values_sheet = sheet.worksheet("ItemValues")
+# ✅ NEW: Add HouseData
+house_data_sheet = sheet.worksheet("HouseData")
 
 # For card logic
 CHEST_TILES = [2, 17, 33]
@@ -197,6 +199,42 @@ def set_used_card_flag(team_name: str, status: str):
                 return
     except Exception as e:
         print(f"❌ Error in set_used_card_flag: {e}")
+
+
+# ✅ NEW: Helper functions for "Bought House This Turn" flag
+def get_bought_house_flag(team_name: str) -> str:
+    """Checks the 'Bought House This Turn' flag for a team. Defaults to 'no'."""
+    try:
+        records = team_data_sheet.get_all_records()
+        for record in records:
+            if record.get("Team") == team_name:
+                # Use .get() for safety, default to "no"
+                return record.get("Bought House This Turn", "no")
+    except Exception as e:
+        print(f"❌ Error in get_bought_house_flag: {e}")
+    return "no" # Default to "no" on error or if not found
+
+def set_bought_house_flag(team_name: str, status: str):
+    """Sets the 'Bought House This Turn' flag for a team."""
+    try:
+        records = team_data_sheet.get_all_records()
+        headers = team_data_sheet.row_values(1)
+        
+        col_name = "Bought House This Turn"
+        if col_name not in headers:
+            print(f"❌ '{col_name}' column not found in TeamData.")
+            return
+            
+        col_index = headers.index(col_name) + 1 # 1-based index
+
+        for idx, record in enumerate(records, start=2):
+            if record.get("Team") == team_name:
+                team_data_sheet.update_cell(idx, col_index, status)
+                print(f"✅ Set '{col_name}' for {team_name} to '{status}'")
+                return
+    except Exception as e:
+        print(f"❌ Error in set_bought_house_flag: {e}")
+# ====================================
 
 
 # ======= Modal (for rejection) =======
@@ -645,6 +683,12 @@ async def roll(interaction: discord.Interaction):
     except Exception as e:
         print(f"❌ Error resetting 'Used Card This Turn' flag for {team_name}: {e}")
 
+    # ✅ NEW: Reset "Bought House This Turn" flag
+    try:
+        set_bought_house_flag(team_name, "no")
+    except Exception as e:
+        print(f"❌ Error resetting 'Bought House This Turn' flag for {team_name}: {e}")
+
     result = random.randint(1, 6)
     
     # Log the command for Godot to process the move
@@ -753,6 +797,138 @@ async def gp(interaction: discord.Interaction):
         print(f"❌ Error in /gp command: {e}")
         await interaction.followup.send("❌ An error occurred while fetching GP balance.", ephemeral=True)
 
+# =============================================================================
+# 🏠 NEW /buy_house COMMAND (WITH RULE CHECKS)
+# =============================================================================
+@bot.tree.command(name="buy_house", description="Attempt to buy a house on your current tile.")
+async def buy_house(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    
+    if interaction.channel_id != COMMAND_CHANNEL_ID:
+        await interaction.followup.send(
+            "❌ You can only use this command in the designated command channel.", ephemeral=True
+        )
+        return
+
+    team_name = get_team(interaction.user)
+    if not team_name:
+        await interaction.followup.send("❌ You must be on a team to buy a house.", ephemeral=True)
+        return
+    
+    try:
+        # === RULE 1: CHECK "Bought House This Turn" FLAG ===
+        bought_flag = get_bought_house_flag(team_name)
+        if bought_flag.lower() == "yes":
+            await interaction.followup.send(
+                "❌ You have already purchased a house this turn. You must roll again to buy another.", 
+                ephemeral=True
+            )
+            return
+
+        # === RULE 2: GET TEAM'S CURRENT TILE ===
+        team_data_records = team_data_sheet.get_all_records()
+        current_pos = -1
+        for record in team_data_records:
+            if record.get("Team") == team_name:
+                current_pos = int(record.get("Position", -1))
+                break
+        
+        if current_pos == -1:
+            await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+            return
+
+        # === RULE 3: CHECK HOUSEDATA FOR THE TILE ===
+        # Assuming HouseData schema: 'Tile' (A), 'Property Name' (B), 'OwnerTeam' (C), 'HouseCount' (D)
+        # ✅ UPDATED: Use get_all_values() for real-time data
+        house_data_values = house_data_sheet.get_all_values()
+        property_row_data = None
+
+        if not house_data_values or len(house_data_values) < 2:
+            print("❌ HouseData sheet is empty or has no headers.")
+            await interaction.followup.send("❌ HouseData sheet is empty.", ephemeral=True)
+            return
+            
+        headers = house_data_values[0]
+        try:
+            tile_col = headers.index("Tile")
+            owner_col = headers.index("OwnerTeam")
+            count_col = headers.index("HouseCount")
+        except ValueError as e:
+            print(f"❌ Missing column in HouseData: {e}")
+            await interaction.followup.send("❌ HouseData sheet is misconfigured.", ephemeral=True)
+            return
+
+        for row in house_data_values[1:]: # Skip headers
+            try:
+                # Ensure row has enough columns
+                if len(row) > tile_col and int(row[tile_col]) == current_pos:
+                    property_row_data = row
+                    break
+            except (ValueError, IndexError):
+                continue # Skip empty or malformed rows
+        
+        if not property_row_data:
+            await interaction.followup.send(
+                "❌ You cannot buy a house on this tile. (It may not be a buyable property)", 
+                ephemeral=True
+            )
+            return
+        
+        # === RULE 4: CHECK OWNERSHIP ===
+        try:
+            owner_team = property_row_data[owner_col]
+            if owner_team != team_name:
+                if not owner_team: # Handle blank owner
+                    owner_team = "Unowned"
+                await interaction.followup.send(
+                    f"❌ You do not own this property. It is owned by **{owner_team}**.", 
+                    ephemeral=True
+                )
+                return
+        except IndexError:
+            await interaction.followup.send("❌ This property does not have an owner.", ephemeral=True)
+            return
+
+        # === RULE 5: CHECK 4-HOUSE LIMIT ===
+        try:
+            house_count = int(property_row_data[count_col] or 0) # HouseCount
+            if house_count >= 4:
+                await interaction.followup.send(
+                    "❌ This property already has the maximum of 4 houses.", 
+                    ephemeral=True
+                )
+                return
+        except IndexError:
+            house_count = 0 # Assume 0 if column is missing
+        except ValueError:
+            house_count = 0 # Assume 0 if value is not a number
+
+        # === ALL CHECKS PASSED ===
+        
+        # 1. Log the command for Godot/Apps Script to process
+        log_command(
+            interaction.user.name,
+            "/buy_house",
+            {"team": team_name}
+        )
+        
+        # 2. Set the flag so they can't buy another
+        set_bought_house_flag(team_name, "yes")
+        
+        # 3. Confirm to user
+        await interaction.followup.send(
+            f"✅ Your request to buy a house (currently {house_count}) has been sent. The game board will update shortly.", 
+            ephemeral=True
+        )
+
+    except gspread.exceptions.APIError as e:
+        print(f"❌ Google Sheets API error in /buy_house: {e}")
+        await interaction.followup.send("❌ A database error occurred. Please try again.", ephemeral=True)
+    except Exception as e:
+        print(f"❌ General error in /buy_house: {e}")
+        await interaction.followup.send("❌ An unexpected error occurred.", ephemeral=True)
+
+# =============================================================================
 
 @bot.tree.command(name="submitdrop", description="Submit a boss drop for review")
 @app_commands.describe(
@@ -2304,8 +2480,8 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             # Redemption Check (Second Priority)
             elif check_and_consume_redemption(target_team):
-                 embed_description += f"🩵 But **{target_team}**'s Redemption activated! The teleport was cancelled!"
-                 if log_chan:
+                embed_description += f"🩵 But **{target_team}**'s Redemption activated! The teleport was cancelled!"
+                if log_chan:
                     fizzle_embed = discord.Embed(
                         title="🩵 Redemption Activated!",
                         description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!",
@@ -2379,5 +2555,5 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Failed to sync commands: {e}")
 
+# ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
-
