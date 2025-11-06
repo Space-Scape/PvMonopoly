@@ -1244,7 +1244,7 @@ def clear_all_active_statuses(team_name: str):
                 # ✅ FIXED: Only look for "active"
                 if team_status and isinstance(team_status, str) and team_status.strip() == "active":
                     card_name = row[name_col]
-                    print(f"     > Found active card: {card_name}. Consuming...")
+                    print(f"      > Found active card: {card_name}. Consuming...")
                     
                     # 1. Consume from Wildcard
                     del wildcard_data[found_key]
@@ -1560,7 +1560,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                         )
                         await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
                     continue # Skip to the next target
-                        
+                    
                 # ✅ CHECK FOR VENGEANCE
                 if check_and_consume_vengeance(target_team):
                     # Rebound
@@ -2228,6 +2228,107 @@ async def use_card(interaction: discord.Interaction, index: int):
                     await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
         # ✅ END: Smite
 
+        # ======================================================================
+        # 🔹 START: NEW CARD - VARROCK TELE
+        # ======================================================================
+        elif selected_card['name'] == "Varrock Tele":
+            # --- PRE-CHECK: Get caster position and rolls ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            rolls_available = 0
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    rolls_available = int(record.get("Rolls Available", 0) or 0)
+                    break
+            
+            if caster_pos == 10:
+                await interaction.followup.send("❌ You cannot use **Varrock Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # --- EFFECT ---
+            new_pos = 20 # Bank Standing tile
+            log_command(
+                team_name,
+                "/card_effect_set_tile",
+                {"team": team_name, "tile": new_pos}
+            )
+            embed_description = f"**{team_name}** used **Varrock Tele** and teleported to **Bank Standing** (Tile 20)!"
+
+            if rolls_available == 0:
+                increment_rolls_available(team_name)
+                embed_description += "\n\n> 🎲 You had no rolls, so you gained one!"
+
+            # Check if they landed on a card tile (though tile 20 is not one)
+            await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
+        # ======================================================================
+        # 🔹 END: NEW CARD - VARROCK TELE
+        # ======================================================================
+        
+        # ======================================================================
+        # 🔹 START: NEW CARD - TELE OTHER
+        # ======================================================================
+        elif selected_card['name'] == "Tele Other":
+            # --- PRE-CHECK ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            opponents = []
+
+            for record in all_teams_data:
+                current_team_name = record.get("Team")
+                if current_team_name == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                elif current_team_name:
+                    opponents.append({
+                        "team": current_team_name,
+                        "pos": int(record.get("Position", -1))
+                    })
+            
+            if not opponents:
+                await interaction.followup.send("❌ Card effect failed: There are no other teams to swap with.", ephemeral=True)
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # --- TARGET SELECTION & EFFECT ---
+            target = random.choice(opponents)
+            target_team = target["team"]
+            target_pos = target["pos"]
+
+            embed_description = f"**{team_name}** used **Tele Other** on **{target_team}**!\n\n"
+
+            # Vengeance Check (Highest Priority)
+            if check_and_consume_vengeance(target_team):
+                embed_description += f"💀 But **{target_team}** had Vengeance active! The teleport fizzled, and both cards were consumed!"
+                # No swap occurs, but both cards are used.
+            
+            # Redemption Check (Second Priority)
+            elif check_and_consume_redemption(target_team):
+                 embed_description += f"🩵 But **{target_team}**'s Redemption activated! The teleport was cancelled!"
+                 if log_chan:
+                    fizzle_embed = discord.Embed(
+                        title="🩵 Redemption Activated!",
+                        description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!",
+                        color=discord.Color.blue()
+                    )
+                    await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
+
+            # Normal Effect
+            else:
+                embed_description += f"🔄 **{team_name}** (from tile {caster_pos}) has swapped places with **{target_team}** (from tile {target_pos})!"
+                
+                # Log commands for Godot to process the swap
+                log_command(team_name, "/card_effect_set_tile", {"team": team_name, "tile": target_pos})
+                log_command(team_name, "/card_effect_set_tile", {"team": target_team, "tile": caster_pos})
+
+                # Check if either team landed on a special tile
+                await check_and_award_card_on_land(team_name, target_pos, log_chan, "being teleported to")
+                await check_and_award_card_on_land(target_team, caster_pos, log_chan, "being teleported to")
+
+        # ======================================================================
+        # 🔹 END: NEW CARD - TELE OTHER
+        # ======================================================================
+
         # --- Other Cards (default use) ---
         else:
             embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
@@ -2279,3 +2380,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
