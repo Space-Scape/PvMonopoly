@@ -509,7 +509,7 @@ class DropReviewButtons(ui.View):
             )
 
             # ==========================================================
-            # 🔹 START: GP CALCULATION LOGIC
+            # 🔹 START: GP CALCULATION & HOUSE TAX LOGIC (MERGED)
             # ==========================================================
             try:
                 gp_multiplier, consumed_card_name = check_and_consume_alchemy(team_name)
@@ -519,25 +519,79 @@ class DropReviewButtons(ui.View):
                 gp_lookup = {item['Item']: int(str(item['GP']).replace(',', '')) for item in item_values_records}
                 
                 base_gp_value = gp_lookup.get(self.drop, 0)
-                final_gp_value = base_gp_value * gp_multiplier # Apply multiplier
-                
+                final_gp_value = base_gp_value * gp_multiplier  # Apply multiplier
+
                 if gp_multiplier > 1 and consumed_card_name:
                     alchemy_bonus = f" (x{gp_multiplier} from {consumed_card_name}!)"
 
                 if final_gp_value > 0 and team_name != "*No team*":
-                    team_data_records = team_data_sheet.get_all_records()
-                    for idx, record in enumerate(team_data_records, start=2):
+                    records = team_data_sheet.get_all_records()
+                    house_records = house_data_sheet.get_all_records()
+
+                    current_tile = None
+                    for rec in records:
+                        if rec.get("Team") == team_name:
+                            current_tile = int(rec.get("Position", 0) or 0)
+                            break
+
+                    # =============================
+                    # 💰 House Tax Calculation
+                    # =============================
+                    tax_amount = 0
+                    owner_team = None
+                    house_count = 0
+
+                    if current_tile is not None:
+                        for hrec in house_records:
+                            tile = int(hrec.get("Tile", 0) or 0)
+                            if tile == current_tile:
+                                owner_team = hrec.get("OwnerTeam", "")
+                                house_count = int(hrec.get("HouseCount", 0) or 0)
+                                break
+
+                        if owner_team and owner_team != team_name and house_count > 0:
+                            tax_map = {1: 0.05, 2: 0.10, 3: 0.20, 4: 0.40}
+                            tax_percent = tax_map.get(house_count, 0)
+                            tax_amount = int(final_gp_value * tax_percent)
+                            final_gp_value -= tax_amount  # Deduct tax before awarding
+
+                    # =============================
+                    # 🧾 Apply GP updates
+                    # =============================
+                    for idx, record in enumerate(records, start=2):
                         if record.get("Team") == team_name:
                             current_gp = int(record.get("GP", 0) or 0)
-                            new_gp = current_gp + final_gp_value # Add final value
-                            team_data_sheet.update_cell(idx, 8, new_gp) # GP is in Column H (8)
-                            print(f"✅ Awarded {final_gp_value} GP to {team_name}. New total: {new_gp}")
+                            new_gp = current_gp + final_gp_value
+                            team_data_sheet.update_cell(idx, 8, new_gp)
+                            print(f"✅ Awarded {final_gp_value:,} GP to {team_name}. New total: {new_gp}")
                             if log_chan:
-                                # ✅ UPDATED Log Message
-                                await log_chan.send(f"<:MaxCash:1347684049040183427> **{team_name}** earned **{final_gp_value:,} GP** from a **{self.drop}** drop!{alchemy_bonus}")
+                                await log_chan.send(
+                                    f"<:MaxCash:1347684049040183427> **{team_name}** earned **{final_gp_value:,} GP** "
+                                    f"from a **{self.drop}** drop!{alchemy_bonus}"
+                                )
                             break
+
+                    # =============================
+                    # 🏠 Transfer tax to house owner
+                    # =============================
+                    if tax_amount > 0 and owner_team:
+                        for o_idx, orec in enumerate(records, start=2):
+                            if orec.get("Team") == owner_team:
+                                owner_gp = int(orec.get("GP", 0) or 0)
+                                new_owner_gp = owner_gp + tax_amount
+                                team_data_sheet.update_cell(o_idx, 8, new_owner_gp)
+                                print(f"🏠 {owner_team} received {tax_amount:,} GP house tax from {team_name}.")
+                                break
+
+                        if log_chan:
+                            await log_chan.send(
+                                f"🏠 **House Tax:** {team_name} paid **{tax_amount:,} GP** "
+                                f"to **{owner_team}** for a level {house_count} house on tile {current_tile} "
+                                f"({int((tax_amount / (tax_amount + final_gp_value)) * 100)}% of the reward)."
+                            )
+
             except Exception as e:
-                print(f"❌ Error during GP calculation: {e}")
+                print(f"❌ Error in GP/tax logic: {e}")
            
             # ==========================================================
             # 🔹 Team Data Sheet Records  
@@ -2814,6 +2868,7 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
 
 
