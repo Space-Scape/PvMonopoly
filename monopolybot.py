@@ -137,49 +137,89 @@ def has_event_staff_role(member: discord.Member) -> bool:
 
 def get_team_house_color(team_name: str) -> str:
     """
-    Retrieves the team's identifier for house ownership.
-    For this game, the team name is used directly as the identifier/color.
+    Retrieves the team's background color hex from TeamData (column F).
+    Used for house color visualization and ownership.
     """
-    return team_name
+    try:
+        team_rows = team_data_sheet.get_all_records()
+        for record in team_rows:
+            if record.get("Team") == team_name:
+                color_hex = record.get("BG Color", "#FFFFFF")
+                if not str(color_hex).startswith("#"):
+                    color_hex = f"#{color_hex}"
+                return color_hex
+    except Exception as e:
+        print(f"❌ Error fetching color for {team_name}: {e}")
+    # Default fallback
+    return "#FFFFFF"
+
 
 def get_houses() -> list:
     """
     Retrieves the list of all active houses from the house data sheet.
-    Returns a list of dictionaries: [{"tile": 5, "color": "Team 1"}, ...]
+    Returns a list of dictionaries: [{"tile": 5, "color": "#ff0000"}, ...]
     """
     try:
         data = house_data_sheet.get_all_records()
         houses = []
-        # Assuming HouseData columns are 'Tile' and 'OwnerTeam'
         for record in data:
             tile = int(record.get("Tile", 0) or 0)
             owner = record.get("OwnerTeam", "")
             if tile > 0 and owner:
-                houses.append({"tile": tile, "color": owner})
+                # Get team color from TeamData
+                color = get_team_house_color(owner)
+                houses.append({"tile": tile, "color": color})
         return houses
     except Exception as e:
         print(f"❌ Error fetching house data: {e}")
         return []
 
+
 def place_house(team_name: str, tile_number: int, is_free: bool) -> bool:
     """
-    Simulates the action of placing/buying a house via the Apps Script API/Game Engine.
-    Used by POH Voucher (is_free=True).
+    Places or buys a house.
+    For POH Voucher (is_free=True), immediately updates the HouseData sheet.
+    For normal houses, sends a /buy_house command to the game engine.
     
-    :returns: True if the placement command was successfully logged.
+    :returns: True if successful.
     """
     try:
-        # This sends the command to the game engine/AppScript for validation and update.
-        # The game engine handles the logic of checking if the tile is eligible.
-        action_type = "/card_effect_place_house_free" if is_free else "/buy_house"
-        log_command(
-            team_name,
-            action_type,
-            {"team": team_name, "tile": tile_number}
-        )
-        return True
+        if is_free:
+            # Directly update the Google Sheet for a free house
+            data = house_data_sheet.get_all_records()
+            updated = False
+
+            for idx, row in enumerate(data, start=2):  # row 1 is headers
+                if int(row.get("Tile", 0)) == tile_number:
+                    # If owned by the same team, increment; otherwise assign new ownership
+                    if row.get("OwnerTeam", "") == team_name:
+                        count = int(row.get("HouseCount", 0)) + 1
+                    else:
+                        count = 1
+                    house_data_sheet.update(f"C{idx}", team_name)  # OwnerTeam col
+                    house_data_sheet.update(f"D{idx}", count)       # HouseCount col
+                    updated = True
+                    print(f"🏠 Updated existing house on tile {tile_number} for {team_name} (now {count} houses).")
+                    break
+
+            if not updated:
+                # Append a new row if tile not found
+                house_data_sheet.append_row([tile_number, "", team_name, 1])
+                print(f"🏠 Added new free house for {team_name} on tile {tile_number}.")
+
+            return True
+
+        else:
+            # Regular purchased house — game engine handles validation
+            log_command(
+                team_name,
+                "/buy_house",
+                {"team": team_name, "tile": tile_number}
+            )
+            return True
+
     except Exception as e:
-        print(f"❌ Error simulating house placement for {team_name} on tile {tile_number}: {e}")
+        print(f"❌ Error placing house for {team_name} on tile {tile_number}: {e}")
         return False
 
 # ======================================================================
@@ -2788,3 +2828,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
