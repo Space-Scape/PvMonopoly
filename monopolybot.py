@@ -800,7 +800,7 @@ async def gp(interaction: discord.Interaction):
         await interaction.followup.send("❌ An error occurred while fetching GP balance.", ephemeral=True)
 
 # =============================================================================
-# 🏠 REPLACED /buy_house COMMAND (WITH DIRECT UPDATE)
+# 🏠 REPLACED /buy_house COMMAND (WITH GP DEDUCTION)
 # =============================================================================
 @bot.tree.command(name="buy_house", description="Attempt to buy a house on your current tile.")
 async def buy_house(interaction: discord.Interaction):
@@ -818,6 +818,15 @@ async def buy_house(interaction: discord.Interaction):
         return
     
     try:
+        # Define progressive house costs
+        # COST_MAP[current_house_count] = cost_for_next_house
+        COST_MAP = {
+            0: 15_000_000, # Cost for 1st house
+            1: 30_000_000, # Cost for 2nd house
+            2: 60_000_000, # Cost for 3rd house
+            3: 120_000_000 # Cost for 4th house
+        }
+        
         # === RULE 1: CHECK "Bought House This Turn" FLAG ===
         bought_flag = get_bought_house_flag(team_name)
         if bought_flag.lower() == "yes":
@@ -827,18 +836,46 @@ async def buy_house(interaction: discord.Interaction):
             )
             return
 
-        # === RULE 2: GET TEAM'S CURRENT TILE ===
-        team_data_records = team_data_sheet.get_all_records()
-        current_pos = -1
-        for record in team_data_records:
-            if record.get("Team") == team_name:
-                current_pos = int(record.get("Position", -1))
-                break
-        
-        if current_pos == -1:
-            await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+        # === RULE 2: GET TEAM'S CURRENT TILE AND GP ===
+        # Using get_all_values() to get row/col index for updating GP
+        team_data_values = team_data_sheet.get_all_values()
+        if not team_data_values or len(team_data_values) < 2:
+            await interaction.followup.send("❌ TeamData sheet is empty.", ephemeral=True)
+            return
+            
+        team_headers = team_data_values[0]
+        try:
+            team_team_col_idx = team_headers.index("Team")
+            team_pos_col_idx = team_headers.index("Position")
+            team_gp_col_idx = team_headers.index("GP")
+            # 1-based column letter/number for gspread update
+            team_gp_col_gspread = team_gp_col_idx + 1
+        except ValueError as e:
+            print(f"❌ Missing column in TeamData: {e}")
+            await interaction.followup.send("❌ TeamData sheet is misconfigured. (Missing Team, Position, or GP)", ephemeral=True)
             return
 
+        current_pos = -1
+        current_gp = 0
+        team_row_index = -1 # 1-based index for gspread
+
+        # Loop starts at index 1 (row 2 in sheet)
+        for i, row in enumerate(team_data_values[1:]): 
+            try:
+                if len(row) > team_team_col_idx and row[team_team_col_idx] == team_name:
+                    current_pos = int(row[team_pos_col_idx])
+                    # Clean GP string (remove commas, handle empty)
+                    current_gp_str = row[team_gp_col_idx].replace(",", "")
+                    current_gp = int(current_gp_str or 0)
+                    team_row_index = i + 2 # +1 for 0-index, +1 for header
+                    break
+            except (ValueError, IndexError):
+                continue # Skip malformed rows
+        
+        if current_pos == -1 or team_row_index == -1:
+            await interaction.followup.send("❌ Could not find your team's data.", ephemeral=True)
+            return
+            
         # === RULE 3: CHECK HOUSEDATA FOR THE TILE ===
         house_data_values = house_data_sheet.get_all_values()
         property_row_data = None
@@ -912,9 +949,26 @@ async def buy_house(interaction: discord.Interaction):
         except (IndexError, ValueError):
             house_count = 0 # Assume 0 if column missing or bad value
 
-        # === ALL CHECKS PASSED --- NOW UPDATE THE SHEET ===
+        # === RULE 6: CALCULATE HOUSE COST (NEW) ===
+        # Get the cost for the *next* house based on the *current* count
+        house_cost = COST_MAP.get(house_count)
+        # This should never happen because of Rule 5, but good to check
+        if house_cost is None: 
+            print(f"❌ Error: Could not determine house cost for count {house_count}")
+            await interaction.followup.send("❌ Cannot determine house cost. Max houses may be reached.", ephemeral=True)
+            return
+
+        # === RULE 7: CHECK GP (AFFORDABILITY) ===
+        if current_gp < house_cost:
+            await interaction.followup.send(
+                f"❌ You do not have enough GP to buy this house. You need **{house_cost:,.0f}** GP, but you only have **{current_gp:,.0f}** GP.",
+                ephemeral=True
+            )
+            return
+
+        # === ALL CHECKS PASSED --- NOW UPDATE THE SHEETS ===
         
-        # 1. Prepare updates
+        # 1. Prepare HouseData updates
         updates_to_make = []
         
         # If property was unowned, set owner
@@ -931,23 +985,28 @@ async def buy_house(interaction: discord.Interaction):
             'values': [[new_house_count]]
         })
 
-        # 2. Perform the update
+        # 2. Perform the HouseData update
         if updates_to_make:
             house_data_sheet.batch_update(updates_to_make)
+            
+        # 3. Perform the TeamData GP update
+        new_gp = current_gp - house_cost
+        team_data_sheet.update_cell(team_row_index, team_gp_col_gspread, new_gp)
         
-        # 3. Set the flag so they can't buy another
+        # 4. Set the flag so they can't buy another
         set_bought_house_flag(team_name, "yes")
         
-        # 4. Log the command (still useful for history)
+        # 5. Log the command
         log_command(
             interaction.user.name,
             "/buy_house",
-            {"team": team_name, "new_house_count": new_house_count}
+            {"team": team_name, "new_house_count": new_house_count, "cost": house_cost}
         )
         
-        # 5. Confirm to user
+        # 6. Confirm to user
         await interaction.followup.send(
-            f"✅ Success! You have purchased a house. This property now has **{new_house_count}** house(s).", 
+            f"✅ Success! You have purchased a house for **{house_cost:,.0f}** GP. This property now has **{new_house_count}** house(s).\n"
+            f"Your team's new balance is **{new_gp:,.0f}** GP.", 
             ephemeral=True
         )
 
@@ -959,7 +1018,6 @@ async def buy_house(interaction: discord.Interaction):
         traceback.print_exc() # Print full error for debugging
         await interaction.followup.send("❌ An unexpected error occurred.", ephemeral=True)
 # =============================================================================
-
 
 @bot.tree.command(name="submitdrop", description="Submit a boss drop for review")
 @app_commands.describe(
@@ -2601,3 +2659,4 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
+
