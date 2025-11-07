@@ -2262,7 +2262,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await check_and_award_card_on_land(target_team, new_pos, log_chan, "being backstabbed to")
         # ✅ END: Backstab
 
-# ✅ START: Smite
+        # ✅ START: Smite
         elif selected_card['name'] == "Smite":
             # --- PRE-CHECK: Find valid targets ---
             all_teams_data = team_data_sheet.get_all_records()
@@ -2367,6 +2367,10 @@ async def use_card(interaction: discord.Interaction, index: int):
                         await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
 
             else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                
+                # NOTE: Elder Maul does not block Smite, as Smite is not a "reduced" effect.
+                
                 card_to_remove = random.choice(non_active_cards)
                 remove_sheet = chest_sheet if card_to_remove in victim_chest_cards else chance_sheet
                 remove_row = card_to_remove['row_index']
@@ -2553,4 +2557,5 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
+
 
