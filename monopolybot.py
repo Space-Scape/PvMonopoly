@@ -987,14 +987,18 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
             card_data = chosen_card["data"]
             card_text = card_data.get("Card Text", "")
             
+            new_roll = None # <-- ADD THIS
+
             # ✅ Handle Wildcard Roll
             if "%d6" in card_text:
                 d6_roll = random.randint(1, 6)
+                new_roll = d6_roll # <-- ADD THIS
                 wildcard_data = {team_name: d6_roll}
                 card_sheet.update_cell(card_row_index, 4, json.dumps(wildcard_data)) # Update Col D
                 print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet")
             elif "%d3" in card_text: # 🔹 NEW
                 d3_roll = random.randint(1, 3) # 🔹 NEW
+                new_roll = d3_roll # <-- ADD THIS
                 wildcard_data = {team_name: d3_roll} # 🔹 NEW
                 card_sheet.update_cell(card_row_index, 4, json.dumps(wildcard_data)) # Update Col D # 🔹 NEW
                 print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet") # 🔹 NEW
@@ -1019,9 +1023,12 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
             card_data = chosen_card["data"]
             card_text = card_data.get("Card Text", "")
             
+            new_roll = None # <-- ADD THIS
+
             # ✅ Handle Wildcard Roll
             if "%d6" in card_text:
                 d6_roll = random.randint(1, 6)
+                new_roll = d6_roll # <-- ADD THIS
                 
                 # Get existing wildcard data and add to it
                 try:
@@ -1036,6 +1043,7 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
 
             elif "%d3" in card_text: # 🔹 NEW
                 d3_roll = random.randint(1, 3) # 🔹 NEW
+                new_roll = d3_roll # <-- ADD THIS
                 
                 # Get existing wildcard data and add to it
                 try: # 🔹 NEW
@@ -1056,6 +1064,11 @@ async def team_receives_card(team_name: str, card_type: str, log_channel):
 
         card_name = card_data.get("Name")
         card_text_display = card_data.get("Card Text")
+        
+        # ✅ NEW: Replace placeholder with the new roll
+        if new_roll is not None:
+            card_text_display = card_text_display.replace("%d6", str(new_roll))
+            card_text_display = card_text_display.replace("%d3", str(new_roll))
         
         embed = discord.Embed(
             title=f"🎴 {card_type} Card Drawn!",
@@ -2557,5 +2570,6 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
+
 
 
