@@ -196,8 +196,10 @@ def place_house(team_name: str, tile_number: int, is_free: bool) -> bool:
                         count = int(row.get("HouseCount", 0)) + 1
                     else:
                         count = 1
-                    house_data_sheet.update(f"C{idx}", team_name)  # OwnerTeam col
-                    house_data_sheet.update(f"D{idx}", count)       # HouseCount col
+
+                    # ✅ Use update_acell to safely write single-cell values
+                    house_data_sheet.update_acell(f"C{idx}", team_name)  # OwnerTeam col
+                    house_data_sheet.update_acell(f"D{idx}", str(count))  # HouseCount col
                     updated = True
                     print(f"🏠 Updated existing house on tile {tile_number} for {team_name} (now {count} houses).")
                     break
@@ -221,6 +223,7 @@ def place_house(team_name: str, tile_number: int, is_free: bool) -> bool:
     except Exception as e:
         print(f"❌ Error placing house for {team_name} on tile {tile_number}: {e}")
         return False
+
 
 # ======================================================================
 # 🎲 Roll Helpers (CRASH FIX for Roll Protection)
@@ -2828,4 +2831,5 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
