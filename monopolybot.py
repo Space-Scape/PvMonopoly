@@ -2,11 +2,13 @@ import os
 import discord
 from discord.ext import commands
 import gspread
+from gspread.utils import rowcol_to_a1 # <-- ADDED IMPORT
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timezone
 import json
 import asyncio
 import random
+import traceback # <-- ADDED IMPORT
 from discord.ui import Modal, TextInput
 from discord import app_commands, ui, Interaction, Member, TextStyle
 from typing import List, Optional
@@ -798,7 +800,7 @@ async def gp(interaction: discord.Interaction):
         await interaction.followup.send("❌ An error occurred while fetching GP balance.", ephemeral=True)
 
 # =============================================================================
-# 🏠 NEW /buy_house COMMAND (WITH RULE CHECKS)
+# 🏠 REPLACED /buy_house COMMAND (WITH DIRECT UPDATE)
 # =============================================================================
 @bot.tree.command(name="buy_house", description="Attempt to buy a house on your current tile.")
 async def buy_house(interaction: discord.Interaction):
@@ -838,10 +840,9 @@ async def buy_house(interaction: discord.Interaction):
             return
 
         # === RULE 3: CHECK HOUSEDATA FOR THE TILE ===
-        # Assuming HouseData schema: 'Tile' (A), 'Property Name' (B), 'OwnerTeam' (C), 'HouseCount' (D)
-        # ✅ UPDATED: Use get_all_values() for real-time data
         house_data_values = house_data_sheet.get_all_values()
         property_row_data = None
+        property_row_index = -1 # <-- We need to store the row number
 
         if not house_data_values or len(house_data_values) < 2:
             print("❌ HouseData sheet is empty or has no headers.")
@@ -850,19 +851,25 @@ async def buy_house(interaction: discord.Interaction):
             
         headers = house_data_values[0]
         try:
-            tile_col = headers.index("Tile")
-            owner_col = headers.index("OwnerTeam")
-            count_col = headers.index("HouseCount")
+            tile_col_idx = headers.index("Tile")
+            owner_col_idx = headers.index("OwnerTeam")
+            count_col_idx = headers.index("HouseCount")
+            # We need the 1-based column letter/number for gspread updates
+            owner_col_gspread = owner_col_idx + 1
+            count_col_gspread = count_col_idx + 1
+            
         except ValueError as e:
             print(f"❌ Missing column in HouseData: {e}")
             await interaction.followup.send("❌ HouseData sheet is misconfigured.", ephemeral=True)
             return
 
-        for row in house_data_values[1:]: # Skip headers
+        # Loop starts at index 1 (row 2 in sheet)
+        for i, row in enumerate(house_data_values[1:]): 
             try:
                 # Ensure row has enough columns
-                if len(row) > tile_col and int(row[tile_col]) == current_pos:
+                if len(row) > tile_col_idx and int(row[tile_col_idx]) == current_pos:
                     property_row_data = row
+                    property_row_index = i + 2 # +1 for 0-index, +1 for header
                     break
             except (ValueError, IndexError):
                 continue # Skip empty or malformed rows
@@ -875,8 +882,9 @@ async def buy_house(interaction: discord.Interaction):
             return
         
         # === RULE 4: CHECK OWNERSHIP ===
+        owner_team = ""
         try:
-            owner_team = property_row_data[owner_col].strip() # Get owner and strip whitespace
+            owner_team = property_row_data[owner_col_idx].strip() # Get owner and strip whitespace
             
             # Case 1: Property is owned by ANOTHER team
             if owner_team and owner_team != team_name:
@@ -885,10 +893,6 @@ async def buy_house(interaction: discord.Interaction):
                     ephemeral=True
                 )
                 return
-
-            # Case 2: Property is unowned (blank) or owned by YOU.
-            # This is a valid state to buy/upgrade.
-            # The Google Apps Script will handle the cost calculation (15M for new, or 30M+ for upgrade).
             
         except IndexError:
             # This should not happen if the sheet is set up, but it means no OwnerTeam column.
@@ -896,34 +900,54 @@ async def buy_house(interaction: discord.Interaction):
             return
 
         # === RULE 5: CHECK 4-HOUSE LIMIT ===
+        house_count = 0
         try:
-            house_count = int(property_row_data[count_col] or 0) # HouseCount
+            house_count = int(property_row_data[count_col_idx] or 0) # HouseCount
             if house_count >= 4:
                 await interaction.followup.send(
                     "❌ This property already has the maximum of 4 houses.", 
                     ephemeral=True
                 )
                 return
-        except IndexError:
-            house_count = 0 # Assume 0 if column is missing
-        except ValueError:
-            house_count = 0 # Assume 0 if value is not a number
+        except (IndexError, ValueError):
+            house_count = 0 # Assume 0 if column missing or bad value
 
-        # === ALL CHECKS PASSED ===
+        # === ALL CHECKS PASSED --- NOW UPDATE THE SHEET ===
         
-        # 1. Log the command for Godot/Apps Script to process
+        # 1. Prepare updates
+        updates_to_make = []
+        
+        # If property was unowned, set owner
+        if not owner_team:
+            updates_to_make.append({
+                'range': gspread.utils.rowcol_to_a1(property_row_index, owner_col_gspread),
+                'values': [[team_name]]
+            })
+            
+        # Increment house count
+        new_house_count = house_count + 1
+        updates_to_make.append({
+            'range': gspread.utils.rowcol_to_a1(property_row_index, count_col_gspread),
+            'values': [[new_house_count]]
+        })
+
+        # 2. Perform the update
+        if updates_to_make:
+            house_data_sheet.batch_update(updates_to_make)
+        
+        # 3. Set the flag so they can't buy another
+        set_bought_house_flag(team_name, "yes")
+        
+        # 4. Log the command (still useful for history)
         log_command(
             interaction.user.name,
             "/buy_house",
-            {"team": team_name}
+            {"team": team_name, "new_house_count": new_house_count}
         )
         
-        # 2. Set the flag so they can't buy another
-        set_bought_house_flag(team_name, "yes")
-        
-        # 3. Confirm to user
+        # 5. Confirm to user
         await interaction.followup.send(
-            f"✅ Your request to buy a house (currently {house_count}) has been sent. The game board will update shortly.", 
+            f"✅ Success! You have purchased a house. This property now has **{new_house_count}** house(s).", 
             ephemeral=True
         )
 
@@ -932,9 +956,10 @@ async def buy_house(interaction: discord.Interaction):
         await interaction.followup.send("❌ A database error occurred. Please try again.", ephemeral=True)
     except Exception as e:
         print(f"❌ General error in /buy_house: {e}")
+        traceback.print_exc() # Print full error for debugging
         await interaction.followup.send("❌ An unexpected error occurred.", ephemeral=True)
-
 # =============================================================================
+
 
 @bot.tree.command(name="submitdrop", description="Submit a boss drop for review")
 @app_commands.describe(
@@ -1755,7 +1780,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                         )
                         await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
                     continue # Skip to the next target
-                    
+                        
                 # ✅ CHECK FOR VENGEANCE
                 if check_and_consume_vengeance(target_team):
                     # Rebound
@@ -2576,7 +2601,3 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
-
-
-
-
