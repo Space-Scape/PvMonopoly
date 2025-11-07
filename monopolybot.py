@@ -2534,13 +2534,129 @@ async def use_card(interaction: discord.Interaction, index: int):
 
             # Check if they landed on a card tile (though tile 20 is not one)
             await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
-        # ======================================================================
         # 🔹 END: NEW CARD - VARROCK TELE
+
         # ======================================================================
-        
+        # 🔹 START: NEW CARD - POH Voucher
         # ======================================================================
-        # 🔹 START: NEW CARD - TELE OTHER
+        elif selected_card['name'] == "POH Voucher":
+            # --- PRE-CHECK: Get caster position ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    break
+            
+            if caster_pos == -1:
+                await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                return # Stop, card is not consumed
+            
+            # --- EFFECT ---
+            # Call the function to place a house for free
+            try:
+                # Assuming 'place_house' handles checking if the tile is eligible and if it succeeds
+                # If placement_successful is False, the card is NOT consumed (handled by 'return')
+                placement_successful = place_house(team_name, caster_pos, is_free=True)
+
+                if not placement_successful:
+                    await interaction.followup.send(
+                        "❌ Card effect failed: A house could not be placed on this tile (e.g., not a property tile or already owned).", 
+                        ephemeral=True
+                    )
+                    return # Stop, card is not consumed
+                
+            except Exception as e:
+                print(f"❌ Error placing house for POH Voucher: {e}")
+                await interaction.followup.send("❌ An internal error occurred during house placement.", ephemeral=True)
+                return # Stop, card is not consumed
+            
+            log_command(
+                team_name,
+                "/card_effect_place_house_free",
+                {"team": team_name, "tile": caster_pos}
+            )
+            
+            embed_description = f"**{team_name}** used **POH Voucher**!\n\n> 🏠 Placed a **free house** on tile **{caster_pos}**!"
+            
         # ======================================================================
+        # 🔹 END: POH Voucher
+        # ======================================================================
+
+        # ======================================================================
+        # 🔹 START: NEW CARD - Home Tele
+        # ======================================================================
+        elif selected_card['name'] == "Home Tele":
+            # --- PRE-CHECK 1: Get caster position ---
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            for record in all_teams_data:
+                if record.get("Team") == team_name:
+                    caster_pos = int(record.get("Position", -1))
+                    break
+            
+            if caster_pos == -1:
+                await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                return # Stop, card is not consumed
+
+            # Tile 10 blocking logic
+            if caster_pos == 10:
+                await interaction.followup.send("❌ You cannot use **Home Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
+                return # Stop, card is not consumed
+            
+            # --- PRE-CHECK 2: Find closest owned house ahead ---
+            houses = get_houses() 
+            house_owner_id = get_team_house_color(team_name) 
+            
+            closest_house_pos = -1
+            min_distance = float('inf')
+            
+            # Find the closest house on a tile *ahead*
+            for house in houses:
+                house_tile = house.get("tile", 0)
+                # Check for same owner/color AND tile is ahead
+                if house.get("color") == house_owner_id and house_tile > caster_pos:
+                    distance = house_tile - caster_pos
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_house_pos = house_tile
+
+            if closest_house_pos == -1:
+                await interaction.followup.send("❌ Card effect failed: No houses of your color are on a tile ahead of you.", ephemeral=True)
+                return # Stop, card is not consumed
+            
+            new_pos = closest_house_pos
+            # --- END PRE-CHECK ---
+
+            embed_description = f"**{team_name}** used **Home Tele**!\n\n"
+
+            # Vengeance Check (Highest Priority)
+            if check_and_consume_vengeance(team_name):
+                embed_description += f"💀 But **Vengeance** was active! The teleport fizzled, and the card was consumed!"
+                if log_chan:
+                    skull_embed = discord.Embed(
+                        title="💀 Vengeance Activated!",
+                        description=f"Your **Vengeance** status blocked your own **Home Tele** card!",
+                        color=discord.Color.dark_red()
+                    )
+                    await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
+            
+            else:
+                # --- NO VENGEANCE, PROCEED WITH TELEPORT ---
+                log_command(
+                    team_name,
+                    "/card_effect_set_tile",
+                    {"team": team_name, "tile": new_pos}
+                )
+                embed_description += f"🏠 Teleported to your closest house on tile **{new_pos}**!"
+                
+                # Check if they landed on a special tile
+                await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
+        # ======================================================================
+        # 🔹 END: Home Tele
+        # ======================================================================
+
         elif selected_card['name'] == "Tele Other":
             # --- PRE-CHECK ---
             all_teams_data = team_data_sheet.get_all_records()
@@ -2557,6 +2673,10 @@ async def use_card(interaction: discord.Interaction, index: int):
                         "pos": int(record.get("Position", -1))
                     })
             
+            if caster_pos == 10:
+                await interaction.followup.send("❌ You cannot use **Tele Other** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
+                return # Stop, card is not consumed
+
             if not opponents:
                 await interaction.followup.send("❌ Card effect failed: There are no other teams to swap with.", ephemeral=True)
                 return # Stop, card is not consumed
@@ -2596,10 +2716,6 @@ async def use_card(interaction: discord.Interaction, index: int):
                 # Check if either team landed on a special tile
                 await check_and_award_card_on_land(team_name, target_pos, log_chan, "being teleported to")
                 await check_and_award_card_on_land(target_team, caster_pos, log_chan, "being teleported to")
-
-        # ======================================================================
-        # 🔹 END: NEW CARD - TELE OTHER
-        # ======================================================================
 
         # --- Other Cards (default use) ---
         else:
@@ -2641,7 +2757,6 @@ async def use_card(interaction: discord.Interaction, index: int):
         await interaction.followup.send(f"❌ An error occurred while using the card: {e}", ephemeral=True)
 # ✅ END: Updated 'use_card' command
 
-
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
@@ -2653,5 +2768,6 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
+
 
 
