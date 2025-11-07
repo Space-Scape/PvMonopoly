@@ -876,17 +876,23 @@ async def buy_house(interaction: discord.Interaction):
         
         # === RULE 4: CHECK OWNERSHIP ===
         try:
-            owner_team = property_row_data[owner_col]
-            if owner_team != team_name:
-                if not owner_team: # Handle blank owner
-                    owner_team = "Unowned"
+            owner_team = property_row_data[owner_col].strip() # Get owner and strip whitespace
+            
+            # Case 1: Property is owned by ANOTHER team
+            if owner_team and owner_team != team_name:
                 await interaction.followup.send(
-                    f"❌ You do not own this property. It is owned by **{owner_team}**.", 
+                    f"❌ You cannot buy here. This property is owned by **{owner_team}**.", 
                     ephemeral=True
                 )
                 return
+
+            # Case 2: Property is unowned (blank) or owned by YOU.
+            # This is a valid state to buy/upgrade.
+            # The Google Apps Script will handle the cost calculation (15M for new, or 30M+ for upgrade).
+            
         except IndexError:
-            await interaction.followup.send("❌ This property does not have an owner.", ephemeral=True)
+            # This should not happen if the sheet is set up, but it means no OwnerTeam column.
+            await interaction.followup.send("❌ This property does not have an owner column.", ephemeral=True)
             return
 
         # === RULE 5: CHECK 4-HOUSE LIMIT ===
@@ -2570,6 +2576,7 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
+
 
 
 
