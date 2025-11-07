@@ -2638,11 +2638,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             embed_description = f"**{team_name}** used **POH Voucher**!\n\n> 🏠 Placed a **free house** on tile **{caster_pos}**!"
             
         # ======================================================================
-        # 🔹 END: POH Voucher
-        # ======================================================================
-
-        # ======================================================================
-        # 🔹 START: NEW CARD - Home Tele
+        # 🔹 START: NEW CARD - Home Tele (fixed)
         # ======================================================================
         elif selected_card['name'] == "Home Tele":
             # --- PRE-CHECK 1: Get caster position ---
@@ -2652,70 +2648,57 @@ async def use_card(interaction: discord.Interaction, index: int):
                 if record.get("Team") == team_name:
                     caster_pos = int(record.get("Position", -1))
                     break
-            
+
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return # Stop, card is not consumed
+                return  # Stop, card is not consumed
 
             # Tile 10 blocking logic
             if caster_pos == 10:
                 await interaction.followup.send("❌ You cannot use **Home Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
-                return # Stop, card is not consumed
-            
-            # --- PRE-CHECK 2: Find closest owned house ahead ---
+                return  # Stop, card is not consumed
+
+            # --- PRE-CHECK 2: Find closest house ahead ---
             try:
-                houses = get_houses() # FIX: get_houses now implemented in helpers
+                houses = get_houses()  # Uses helper
             except Exception as e:
                 print(f"❌ Error fetching houses for Home Tele: {e}")
                 await interaction.followup.send("❌ An internal error occurred while finding houses.", ephemeral=True)
                 return
-            
-            house_owner_id = get_team_house_color(team_name) # FIX: get_team_house_color now implemented in helpers
-            
+
             closest_house_pos = -1
             min_distance = float('inf')
-            
-            # Find the closest house on a tile *ahead*
+
+            # Find the closest house on any tile *ahead* of current position
             for house in houses:
                 house_tile = house.get("tile", 0)
-                # Check for same owner/color AND tile is ahead
-                if house.get("color") == house_owner_id and house_tile > caster_pos:
+                if house_tile > caster_pos:
                     distance = house_tile - caster_pos
                     if distance < min_distance:
                         min_distance = distance
                         closest_house_pos = house_tile
 
             if closest_house_pos == -1:
-                await interaction.followup.send("❌ Card effect failed: No houses of your color are on a tile ahead of you.", ephemeral=True)
-                return # Stop, card is not consumed
-            
+                await interaction.followup.send("❌ Card effect failed: No house tiles are ahead of you on the board.", ephemeral=True)
+                return  # Stop, card is not consumed
+
             new_pos = closest_house_pos
             # --- END PRE-CHECK ---
 
+            # --- EFFECT EXECUTION ---
             embed_description = f"**{team_name}** used **Home Tele**!\n\n"
+            embed_description += f"🏠 Teleported to the **nearest house tile ahead** (tile **{new_pos}**)."
 
-            # Vengeance Check (Highest Priority)
-            if check_and_consume_vengeance(team_name):
-                embed_description += f"💀 But **Vengeance** was active! The teleport fizzled, and the card was consumed!"
-                if log_chan:
-                    skull_embed = discord.Embed(
-                        title="💀 Vengeance Activated!",
-                        description=f"Your **Vengeance** status blocked your own **Home Tele** card!",
-                        color=discord.Color.dark_red()
-                    )
-                    await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
-            
-            else:
-                # --- NO VENGEANCE, PROCEED WITH TELEPORT ---
-                log_command(
-                    team_name,
-                    "/card_effect_set_tile",
-                    {"team": team_name, "tile": new_pos}
-                )
-                embed_description += f"🏠 Teleported to your closest house on tile **{new_pos}**!"
-                
-                # Check if they landed on a special tile
-                await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
+            # Log the teleport immediately — no Vengeance check (positive effect)
+            log_command(
+                team_name,
+                "/card_effect_set_tile",
+                {"team": team_name, "tile": new_pos}
+            )
+
+            # Announce and check any landing effects
+            await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
+
         # ======================================================================
         # 🔹 END: Home Tele
         # ======================================================================
@@ -2831,5 +2814,6 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
 
