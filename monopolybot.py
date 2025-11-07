@@ -1031,12 +1031,6 @@ async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attac
         print("❌ Interaction not found or timed out before defer.")
         return
 
-    if interaction.channel_id != COMMAND_CHANNEL_ID:
-        await interaction.followup.send(
-            "❌ You can only use this command in the designated command channel.", ephemeral=True
-        )
-        return
-
     if submitted_for is None:
         submitted_for = interaction.user
 
@@ -2659,4 +2653,5 @@ async def on_ready():
 
 # ✅ THIS IS THE MISSING PIECE
 bot.run(os.getenv('bot_token'))
+
 
