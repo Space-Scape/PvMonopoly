@@ -2,13 +2,13 @@ import os
 import discord
 from discord.ext import commands
 import gspread
-from gspread.utils import rowcol_to_a1 # <-- ADDED IMPORT
+from gspread.utils import rowcol_to_a1
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timezone
 import json
 import asyncio
 import random
-import traceback # <-- ADDED IMPORT
+import traceback
 from discord.ui import Modal, TextInput
 from discord import app_commands, ui, Interaction, Member, TextStyle
 from typing import List, Optional
@@ -131,6 +131,75 @@ def has_event_captain_role(member: discord.Member) -> bool:
 def has_event_staff_role(member: discord.Member) -> bool:
     return any(role.name == REQUIRED_ROLE_NAME for role in member.roles)
 
+# ======================================================================
+# 🏠 House/Tile Helpers (CRASH FIXES for POH Voucher & Home Tele)
+# ======================================================================
+
+def get_team_house_color(team_name: str) -> str:
+    """
+    Retrieves the team's identifier for house ownership.
+    For this game, the team name is used directly as the identifier/color.
+    """
+    return team_name
+
+def get_houses() -> list:
+    """
+    Retrieves the list of all active houses from the house data sheet.
+    Returns a list of dictionaries: [{"tile": 5, "color": "Team 1"}, ...]
+    """
+    try:
+        data = house_data_sheet.get_all_records()
+        houses = []
+        # Assuming HouseData columns are 'Tile' and 'OwnerTeam'
+        for record in data:
+            tile = int(record.get("Tile", 0) or 0)
+            owner = record.get("OwnerTeam", "")
+            if tile > 0 and owner:
+                houses.append({"tile": tile, "color": owner})
+        return houses
+    except Exception as e:
+        print(f"❌ Error fetching house data: {e}")
+        return []
+
+def place_house(team_name: str, tile_number: int, is_free: bool) -> bool:
+    """
+    Simulates the action of placing/buying a house via the Apps Script API/Game Engine.
+    Used by POH Voucher (is_free=True).
+    
+    :returns: True if the placement command was successfully logged.
+    """
+    try:
+        # This sends the command to the game engine/AppScript for validation and update.
+        # The game engine handles the logic of checking if the tile is eligible.
+        action_type = "/card_effect_place_house_free" if is_free else "/buy_house"
+        log_command(
+            team_name,
+            action_type,
+            {"team": team_name, "tile": tile_number}
+        )
+        return True
+    except Exception as e:
+        print(f"❌ Error simulating house placement for {team_name} on tile {tile_number}: {e}")
+        return False
+
+# ======================================================================
+# 🎲 Roll Helpers (CRASH FIX for Roll Protection)
+# ======================================================================
+
+def get_team_rolls(team_name: str) -> int:
+    """
+    Retrieves the current 'Rolls Available' count for a team.
+    """
+    try:
+        records = team_data_sheet.get_all_records()
+        for record in records:
+            if record.get("Team") == team_name:
+                return int(record.get("Rolls Available", 0) or 0)
+        return 0
+    except Exception as e:
+        print(f"❌ Error getting team rolls for {team_name}: {e}")
+        return 0
+
 def increment_rolls_available(team_name: str):
     try:
         records = team_data_sheet.get_all_records()
@@ -142,7 +211,7 @@ def increment_rolls_available(team_name: str):
                     return
                 col_index = headers.index("Rolls Available") + 1
                 current_rolls = team_data_sheet.cell(idx, col_index).value
-                current_rolls_int = int(current_rolls) if current_rolls and current_rolls.isdigit() else 0
+                current_rolls_int = int(current_rolls) if current_rolls and str(current_rolls).isdigit() else 0
                 team_data_sheet.update_cell(idx, col_index, current_rolls_int + 1)
                 print(f"✅ Incremented rolls for {team_name} to {current_rolls_int + 1}")
                 return
@@ -160,7 +229,7 @@ def decrement_rolls_available(team_name: str):
                     return
                 col_index = headers.index("Rolls Available") + 1
                 current_rolls = team_data_sheet.cell(idx, col_index).value
-                current_rolls_int = int(current_rolls) if current_rolls and current_rolls.isdigit() else 0
+                current_rolls_int = int(current_rolls) if current_rolls and str(current_rolls).isdigit() else 0
                 new_val = max(0, current_rolls_int - 1)
                 team_data_sheet.update_cell(idx, col_index, new_val)
                 print(f"✅ Decremented rolls for {team_name}: {current_rolls_int} → {new_val}")
@@ -956,10 +1025,12 @@ async def buy_house(interaction: discord.Interaction):
             {"team": team_name, "new_house_count": new_house_count, "cost": house_cost}
         )
         
+        # FIX: Send publicly as requested by the user's dev note
         await interaction.followup.send(
-            f"🏠 House purchased for **{house_cost:,.0f}** GP. This property now has **{new_house_count}** house(s).\n"
-            f"Your team's new balance is **{new_gp:,.0f}** GP.", 
-            ephemeral=True
+            f"🏠 **{team_name}** purchased a house for **{house_cost:,.0f}** GP on tile {current_pos}!\n"
+            f"This property now has **{new_house_count}** house(s).\n"
+            f"Your team's new balance is **{new_gp:,.0f}** GP.",
+            ephemeral=False 
         )
 
     except gspread.exceptions.APIError as e:
@@ -1532,12 +1603,14 @@ async def show_cards(interaction: discord.Interaction):
 @bot.tree.command(name="use_card", description="Use a held card by its index from /show_cards")
 @app_commands.describe(index="The index of the card you want to use (starts at 1)")
 async def use_card(interaction: discord.Interaction, index: int):
+    # Changed ephemeral=False to keep the card execution public
     await interaction.response.defer(ephemeral=False) 
     team_name = get_team(interaction.user)
     if not team_name:
         await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
         return
 
+    # ✅ NEW: Check "Used Card This Turn" flag
     try:
         used_card_flag = get_used_card_flag(team_name)
         if used_card_flag == "yes":
@@ -1546,6 +1619,7 @@ async def use_card(interaction: discord.Interaction, index: int):
     except Exception as e:
         print(f"❌ Error checking used_card_flag: {e}")
 
+    # Get cards *with* parsed wildcard text
     chest_cards = get_held_cards(chest_sheet, team_name)
     chance_cards = get_held_cards(chance_sheet, team_name)
     all_cards = chest_cards + chance_cards
@@ -1554,7 +1628,7 @@ async def use_card(interaction: discord.Interaction, index: int):
         await interaction.followup.send(f"❌ Invalid card index. Use `/show_cards` and pick a number between 1 and {len(all_cards)}.", ephemeral=True)
         return
     
-    selected_card = all_cards[index - 1]
+    selected_card = all_cards[index - 1] # Convert 1-based index to 0-based
     card_type = "Chest" if (index - 1) < len(chest_cards) else "Chance"
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     card_row = selected_card['row_index']
@@ -1563,15 +1637,18 @@ async def use_card(interaction: discord.Interaction, index: int):
     final_card_text = selected_card['text']
     log_chan = bot.get_channel(LOG_CHANNEL_ID)
     
+    # This boolean will be set to True if the card is a status effect and is NOT consumed
     is_status_activation = False
-    embed_description = "" 
+    embed_description = "" # Initialize embed description
 
     try:
+        # --- 1. Get Wildcard Data ---
         wildcard_data_str = card_sheet.cell(card_row, 4).value or "{}"
         wildcard_data = {}
         team_wildcard_value = None
         try:
             wildcard_data = json.loads(wildcard_data_str)
+            # ✅ FIXED: check for str(val).strip()
             val = wildcard_data.get(team_name)
             if val and isinstance(val, str):
                 team_wildcard_value = val.strip()
@@ -1580,15 +1657,18 @@ async def use_card(interaction: discord.Interaction, index: int):
         except Exception as e:
             print(f"❌ Error parsing wildcard for {team_name}: {e}")
 
-        #  Vengeance
+        # --- 2. Handle Card Effect ---
+        
+        # --- Vengeance ---
         if selected_card['name'] == "Vengeance":
+            # ✅ FIXED: Check if already active
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
             
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True
+            is_status_activation = True # Mark as activation
             
             embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
             if log_chan:
@@ -1600,7 +1680,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
 
-        #  Redemption
+        # ✅ NEW: Redemption
         elif selected_card['name'] == "Redemption":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
@@ -1620,7 +1700,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Redemption**!", ephemeral=False)
 
-        #  Elder Maul
+        # ✅ NEW: Elder Maul
         elif selected_card['name'] == "Elder Maul":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
@@ -1640,61 +1720,75 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Elder Maul**!", ephemeral=False)
 
-        #  Low Alchemy
+        # --- Low Alchemy ---
         elif selected_card['name'] == "Low Alchemy":
+            # ✅ FIXED: Check if already active
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
 
-            wildcard_data[team_name] = "active"
+            wildcard_data[team_name] = "active" # ✅ FIXED: Store "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True
+            is_status_activation = True # Mark as activation
             
             embed_description = f"**{team_name}** used **Low Alchemy**!\n\n> Your next drop this turn will be worth **double GP**."
             if log_chan:
                 embed = discord.Embed(
                     title="<:coin:1406230459301630043> Card Activated: Low Alchemy",
                     description=embed_description,
-                    color=discord.Color.from_rgb(204, 153, 0)
+                    color=discord.Color.from_rgb(204, 153, 0) # Gold
                 )
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Low Alchemy**!", ephemeral=False)
 
-        #  High Alchemy
+        # --- High Alchemy ---
         elif selected_card['name'] == "High Alchemy":
+            # ✅ FIXED: Check if already active
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
                 
-            wildcard_data[team_name] = "active"
+            wildcard_data[team_name] = "active" # ✅ FIXED: Store "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True
+            is_status_activation = True # Mark as activation
             
             embed_description = f"**{team_name}** used **High Alchemy**!\n\n> Your next drop this turn will be worth **triple GP**."
             if log_chan:
                 embed = discord.Embed(
                     title="<:MaxCash:1347684049040183427> Card Activated: High Alchemy",
                     description=embed_description,
-                    color=discord.Color.from_rgb(0, 204, 0)
+                    color=discord.Color.from_rgb(0, 204, 0) # Green
                 )
                 await log_chan.send(embed=embed)
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **High Alchemy**!", ephemeral=False)
 
-        #  Vile Vigour
+        # --- Vile Vigour ---
         elif selected_card['name'] == "Vile Vigour" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
             
+            # 🔹 Get caster pos 🔹
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
+            rolls_available = 0
             for record in all_teams_data:
                 if record.get("Team") == team_name:
                     caster_pos = int(record.get("Position", -1))
+                    rolls_available = int(record.get("Rolls Available", 0) or 0)
                     break
             
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return
+                return # Stop, card is not consumed
 
+            # 🔹 NEW: Zero Roll Protection 🔹
+            if rolls_available == 0:
+                increment_rolls_available(team_name)
+                embed_description = "> 🎲 You had no rolls available, so you gained one for the forced move/teleport.\n\n"
+            else:
+                embed_description = ""
+
+
+            # 🔹 ADDED: Calculate new_pos 🔹
             new_pos = (caster_pos + stored_roll) % BOARD_SIZE
             if new_pos == 12: new_pos = 28 if caster_pos != 38 else 12
             elif new_pos == 28: new_pos = 38 if caster_pos != 12 else 28
@@ -1706,15 +1800,17 @@ async def use_card(interaction: discord.Interaction, index: int):
                 "/card_effect_move", 
                 {"team": team_name, "move": stored_roll}
             )
-            embed_description = f"**{team_name}** used **Vile Vigour** and moved **{stored_roll}** spaces forward!"
+            embed_description += f"**{team_name}** used **Vile Vigour** and moved **{stored_roll}** spaces forward!"
 
+            # 🔹 ADDED: Check for card 🔹
             await check_and_award_card_on_land(team_name, new_pos, log_chan, "using Vile Vigour to")
 
-        #  Dragon Spear
+        # --- Dragon Spear ---
         elif selected_card['name'] == "Dragon Spear" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
-            move_amount = -stored_roll
+            move_amount = -stored_roll # Move back
             
+            # --- PRE-CHECK ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             targets = []
@@ -1734,10 +1830,13 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not targets:
                 await interaction.followup.send("❌ Card effect failed: No other teams are on your tile.", ephemeral=True)
-                return
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
 
+            # Log effects and build embed
             embed_description = f"**{team_name}** used **Dragon Spear**!\n\n"
             for target_team in targets:
+                # ✅ NEW REDEMPTION CHECK
                 if check_and_consume_redemption(target_team):
                     embed_description += f"🩵 **{target_team}**'s Redemption activated!\n"
                     if log_chan:
@@ -1747,10 +1846,13 @@ async def use_card(interaction: discord.Interaction, index: int):
                             color=discord.Color.blue()
                         )
                         await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
-                    continue
+                    continue # Skip to the next target
                         
+                # ✅ CHECK FOR VENGEANCE
                 if check_and_consume_vengeance(target_team):
+                    # Rebound
                     
+                    # ✅ NEW ELDER MAUL CHECK (on caster)
                     elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
                     final_move_amount = move_amount # This is -stored_roll
                     if elder_maul_active:
@@ -1772,6 +1874,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
                     
+                    # 🔹 ADDED: Check for card 🔹
                     await check_and_award_card_on_land(team_name, new_pos, log_chan, "being rebounded by Dragon Spear to")
 
                     if log_chan:
@@ -1784,6 +1887,9 @@ async def use_card(interaction: discord.Interaction, index: int):
                     continue # Skip to next target
                 
                 else:
+                    # Normal effect
+                    
+                    # ✅ NEW ELDER MAUL CHECK
                     elder_maul_active = check_and_consume_elder_maul(target_team)
                     final_move_amount = move_amount # This is -stored_roll
                     if elder_maul_active:
@@ -1797,6 +1903,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                             )
                             await log_chan.send(content=f"To {target_team}:", embed=maul_embed)
 
+                    # Get target's current pos (which is same as caster_pos)
                     target_pos = caster_pos 
                     new_pos = max(0, target_pos + final_move_amount) # Calculate new_pos
                     log_command(
@@ -1806,14 +1913,17 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     embed_description += f"**{target_team}** was moved back **{abs(final_move_amount)}** tiles (stops at Go)!\n"
                     
+                    # 🔹 ADDED: Check for card 🔹
                     await check_and_award_card_on_land(target_team, new_pos, log_chan, "being hit by Dragon Spear to")
 
 
-        #  Rogue's Gloves
+        # --- Rogue's Gloves ---
         elif selected_card['name'] == "Rogue's Gloves":
             
+            # --- PRE-CHECK ---
             stealable_cards = []
             
+            # Check Chance cards
             chance_data = chance_sheet.get_all_values()
             if chance_data:
                 headers = chance_data[0]
@@ -1847,6 +1957,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                                 "victim_team": held_by_str.strip() 
                             })
 
+            # Check Chest cards
             chest_data = chest_sheet.get_all_values()
             if chest_data:
                 headers = chest_data[0]
@@ -1888,11 +1999,15 @@ async def use_card(interaction: discord.Interaction, index: int):
             if not stealable_cards:
                 await interaction.followup.send("❌ Card effect failed: There are no eligible cards to steal.", ephemeral=True)
                 return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # --- A card was found, let's steal it ---
             stolen_card = random.choice(stealable_cards)
             victim_team = stolen_card["victim_team"]
             target_sheet = stolen_card["sheet"]
             target_row = stolen_card["row_index"]
             
+            # ✅ NEW REDEMPTION CHECK (on the victim)
             if check_and_consume_redemption(victim_team):
                 embed_description = f"**{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n🩵 But **{victim_team}**'s Redemption activated!"
                 if log_chan:
@@ -1902,8 +2017,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                         color=discord.Color.blue()
                     )
                     await log_chan.send(content=f"To {victim_team}:", embed=fizzle_embed)
+                # Card is still consumed, but the effect stops here
             
             else:
+                # --- NO REDEMPTION, PROCEED WITH STEAL ---
+                # 1. Update "Held By Team"
                 held_by_str = str(target_sheet.cell(target_row, 3).value or "")
                 teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
                 if victim_team in teams:
@@ -1912,6 +2030,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     teams.append(team_name)
                 target_sheet.update_cell(target_row, 3, ", ".join(teams))
 
+                # 2. Transfer Wildcard Data
                 wildcard_str = str(target_sheet.cell(target_row, 4).value or "{}")
                 try:
                     wildcard_data_json = json.loads(wildcard_str)
@@ -1924,6 +2043,7 @@ async def use_card(interaction: discord.Interaction, index: int):
 
                 embed_description = f"**{team_name}** used **Rogue's Gloves** and stole **{stolen_card['card_name']}** from **{victim_team}**!"
                 
+                # Send a message to the victim
                 if log_chan:
                     victim_embed = discord.Embed(
                         title="‼️ Card Stolen!",
@@ -1932,7 +2052,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
 
-        #  Pickpocket
+        # ✅ START: Pickpocket
         elif selected_card['name'] == "Pickpocket":
             all_teams_data = team_data_sheet.get_all_records()
             opponents_gp = []
@@ -1940,6 +2060,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             caster_row = -1
             caster_gp = 0
 
+            # Get all team GP
             for idx, record in enumerate(all_teams_data, start=2):
                 gp = int(record.get("GP", 0) or 0)
                 team = record.get("Team")
@@ -1952,8 +2073,9 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not opponents_gp:
                 await interaction.followup.send("❌ Card effect failed: No other teams found.", ephemeral=True)
-                return
+                return # Stop, card is not consumed
             
+            # Find target with most GP
             target = max(opponents_gp, key=lambda x: x["gp"])
             target_team = target["team"]
             target_gp = target["gp"]
@@ -1969,10 +2091,11 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if steal_amount == 0:
                 await interaction.followup.send("❌ Card effect failed: No teams have enough wealth to steal from (min 5M GP).", ephemeral=True)
-                return
+                return # Stop, card is not consumed
 
             embed_description = f"**{team_name}** used **Pickpocket** on **{target_team}**!\n\n"
 
+            # ✅ NEW REDEMPTION CHECK
             if check_and_consume_redemption(target_team):
                 embed_description += f"🩵 **{target_team}**'s Redemption activated!"
                 if log_chan:
@@ -1983,8 +2106,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
             
+            # ✅ CHECK FOR VENGEANCE
             elif check_and_consume_vengeance(target_team):
+                # Rebound
                 
+                # ✅ NEW ELDER MAUL CHECK (on the *caster* this time)
                 elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
                 final_steal_amount = steal_amount
                 if elder_maul_active:
@@ -2014,6 +2140,9 @@ async def use_card(interaction: discord.Interaction, index: int):
                     await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
 
             else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                
+                # ✅ NEW ELDER MAUL CHECK
                 elder_maul_active = check_and_consume_elder_maul(target_team)
                 final_steal_amount = steal_amount
                 if elder_maul_active:
@@ -2035,6 +2164,7 @@ async def use_card(interaction: discord.Interaction, index: int):
 
                 embed_description += f"💰 Stole **{final_steal_amount:,} GP** from **{target_team}**!"
                 
+                # Send message to victim
                 if log_chan:
                     victim_embed = discord.Embed(
                         title="‼️ GP Stolen!",
@@ -2042,9 +2172,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                         color=discord.Color.dark_red()
                     )
                     await log_chan.send(content=f"To {target_team}:", embed=victim_embed)
+        # ✅ END: Pickpocket
 
-        #  Lure
+        # ✅ START: Lure
         elif selected_card['name'] == "Lure":
+            # --- PRE-CHECK ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             opponents_ahead = []
@@ -2070,6 +2202,9 @@ async def use_card(interaction: discord.Interaction, index: int):
             if not opponents_ahead:
                 await interaction.followup.send("❌ Card effect failed: No opponents are ahead of you.", ephemeral=True)
                 return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # Find the closest target
             sorted_opponents = sorted(opponents_ahead, key=lambda x: x[1])
             target_team = sorted_opponents[0][0]
             target_pos = sorted_opponents[0][1]
@@ -2085,6 +2220,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
             
             else:
+                # --- NO REDEMPTION, PROCEED WITH LURE ---
                 log_command(
                     team_name,
                     "/card_effect_set_tile",
@@ -2092,10 +2228,13 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 embed_description = f"**{team_name}** used **Lure**!\n\n🎣 **{target_team}** (on tile {target_pos}) was lured to your tile (tile {caster_pos})!"
                 
+                # 🔹 ADDED: Check for card 🔹
                 await check_and_award_card_on_land(target_team, caster_pos, log_chan, "being lured to")
+        # ✅ END: Lure
 
-        #  Escape Crystal
+        # 🔹 START: Escape Crystal
         elif selected_card['name'] == "Escape Crystal":
+            # --- PRE-CHECK: Get caster position ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             for record in all_teams_data:
@@ -2107,13 +2246,16 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await interaction.followup.send("❌ You can only use the **Escape Crystal** on tile 10 (Nex/Gauntlet).", ephemeral=True)
                 return # Stop, card is not consumed
 
+            # Card effect is valid
             increment_rolls_available(team_name)
             embed_description = f"**{team_name}** used the **Escape Crystal** on tile 10!\n\n> 🎲 You have gained a free roll!"
+        # 🔹 END: Escape Crystal
 
-        #  Backstab
+        # ✅ START: Backstab
         elif selected_card['name'] == "Backstab" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
             
+            # --- PRE-CHECK ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             opponents_ahead = []
@@ -2125,7 +2267,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return
+                return # Stop, card is not consumed
 
             for record in all_teams_data:
                 opponent_team_name = record.get("Team")
@@ -2138,13 +2280,17 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not opponents_ahead:
                 await interaction.followup.send("❌ Card effect failed: No opponents are ahead of you.", ephemeral=True)
-                return
+                return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # Find the closest target
             sorted_opponents = sorted(opponents_ahead, key=lambda x: x[1])
             target_team = sorted_opponents[0][0]
             target_pos = sorted_opponents[0][1] # Target's current position
             
             embed_description = f"**{team_name}** used **Backstab**!\n\n"
 
+            # ✅ NEW REDEMPTION CHECK
             if check_and_consume_redemption(target_team):
                 embed_description += f"🩵 **{target_team}**'s Redemption activated!"
                 if log_chan:
@@ -2155,8 +2301,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
             
+            # ✅ CHECK FOR VENGEANCE
             elif check_and_consume_vengeance(target_team):
+                # Rebound
                 
+                # ✅ NEW ELDER MAUL CHECK (on caster)
                 elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
                 final_roll_val = stored_roll
                 if elder_maul_active:
@@ -2170,6 +2319,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                         )
                         await log_chan.send(content=f"To {team_name}:", embed=maul_embed) # Send to caster
                 
+                # Calculate new position (behind caster)
                 new_pos = max(0, caster_pos - final_roll_val)
                 
                 log_command(
@@ -2179,6 +2329,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
                 
+                # 🔹 ADDED: Check for card 🔹
                 await check_and_award_card_on_land(team_name, new_pos, log_chan, "being rebounded by Backstab to")
 
                 if log_chan:
@@ -2190,6 +2341,9 @@ async def use_card(interaction: discord.Interaction, index: int):
                     await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
             
             else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                
+                # ✅ NEW ELDER MAUL CHECK
                 elder_maul_active = check_and_consume_elder_maul(target_team)
                 final_roll_val = stored_roll # This is the positive roll value
                 if elder_maul_active:
@@ -2203,6 +2357,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                         )
                         await log_chan.send(content=f"To {target_team}:", embed=maul_embed)
 
+                # Calculate new position (behind caster)
                 new_pos = max(0, caster_pos - final_roll_val)
                 
                 log_command(
@@ -2210,12 +2365,16 @@ async def use_card(interaction: discord.Interaction, index: int):
                     "/card_effect_set_tile",
                     {"team": target_team, "tile": new_pos}
                 )
-                embed_description += f"🔪 **{target_team}** (on tile {target_pos}) was backstabbed to tile {new_pos}!"
+                # FIX: Explicitly include the roll amount in the description to prevent placeholder fallback
+                embed_description += f"🔪 **{target_team}** (on tile {target_pos}) was moved back **{final_roll_val}** tiles to tile {new_pos}!"
                 
+                # 🔹 ADDED: Check for card 🔹
                 await check_and_award_card_on_land(target_team, new_pos, log_chan, "being backstabbed to")
+        # ✅ END: Backstab
 
-        #  Smite
+        # ✅ START: Smite
         elif selected_card['name'] == "Smite":
+            # --- PRE-CHECK: Find valid targets ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             
@@ -2245,10 +2404,12 @@ async def use_card(interaction: discord.Interaction, index: int):
             if not valid_targets:
                 await interaction.followup.send("❌ Card effect failed: No opponents are within 1 tile of you.", ephemeral=True)
                 return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
 
             victim_team = random.choice(valid_targets)
             embed_description = f"**{team_name}** used **Smite** on **{victim_team}**!\n\n"
 
+            # --- PRE-CHECK 2: Find victim's cards ---
             victim_chest_cards = get_held_cards(chest_sheet, victim_team)
             victim_chance_cards = get_held_cards(chance_sheet, victim_team)
             all_victim_cards = victim_chest_cards + victim_chance_cards
@@ -2258,7 +2419,9 @@ async def use_card(interaction: discord.Interaction, index: int):
             if not non_active_cards:
                 await interaction.followup.send(f"❌ Card effect failed: **{victim_team}** has no cards that can be removed.", ephemeral=True)
                 return # Stop, card is not consumed
+            # --- END PRE-CHECK 2 ---
 
+            # ✅ NEW REDEMPTION CHECK
             if check_and_consume_redemption(victim_team):
                 embed_description += f"🩵 **{victim_team}**'s Redemption activated!"
                 if log_chan:
@@ -2269,9 +2432,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     await log_chan.send(content=f"To {victim_team}:", embed=fizzle_embed)
             
+            # ✅ CHECK FOR VENGEANCE
             elif check_and_consume_vengeance(victim_team):
                 embed_description += f"💀 **{victim_team}** had Vengeance! The effect was rebounded!\n"
                 
+                # Find a card from the caster to remove
                 caster_chest_cards = get_held_cards(chest_sheet, team_name)
                 caster_chance_cards = get_held_cards(chance_sheet, team_name)
                 all_caster_cards = caster_chest_cards + caster_chance_cards
@@ -2284,6 +2449,8 @@ async def use_card(interaction: discord.Interaction, index: int):
                     remove_sheet = chest_sheet if card_to_remove in caster_chest_cards else chance_sheet
                     remove_row = card_to_remove['row_index']
                     
+                    # Remove card from caster
+                    # 1. Clear Wildcard
                     wildcard_str = str(remove_sheet.cell(remove_row, 4).value or "{}")
                     try:
                         wildcard_data = json.loads(wildcard_str)
@@ -2292,6 +2459,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     except Exception as e:
                         print(f"❌ Error clearing wildcard on Vengeance Smite: {e}")
                         
+                    # 2. Clear "Held By"
                     held_by_str = str(remove_sheet.cell(remove_row, 3).value or "")
                     teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
                     if team_name in teams:
@@ -2309,11 +2477,16 @@ async def use_card(interaction: discord.Interaction, index: int):
                         await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
 
             else:
+                # --- NO REDEMPTION/VENGEANCE, PROCEED ---
+                
+                # NOTE: Elder Maul does not block Smite, as Smite is not a "reduced" effect.
                 
                 card_to_remove = random.choice(non_active_cards)
                 remove_sheet = chest_sheet if card_to_remove in victim_chest_cards else chance_sheet
                 remove_row = card_to_remove['row_index']
 
+                # Remove card from victim
+                # 1. Clear Wildcard
                 wildcard_str = str(remove_sheet.cell(remove_row, 4).value or "{}")
                 try:
                     wildcard_data = json.loads(wildcard_str)
@@ -2322,6 +2495,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                 except Exception as e:
                     print(f"❌ Error clearing wildcard on Smite: {e}")
                     
+                # 2. Clear "Held By"
                 held_by_str = str(remove_sheet.cell(remove_row, 3).value or "")
                 teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
                 if victim_team in teams:
@@ -2330,6 +2504,7 @@ async def use_card(interaction: discord.Interaction, index: int):
 
                 embed_description += f"🌩️ **{victim_team}** was smote and lost their **{card_to_remove['name']}** card!"
                 
+                # Send message to victim
                 if log_chan:
                     victim_embed = discord.Embed(
                         title="‼️ Card Lost!",
@@ -2337,9 +2512,13 @@ async def use_card(interaction: discord.Interaction, index: int):
                         color=discord.Color.dark_red()
                     )
                     await log_chan.send(content=f"To {victim_team}:", embed=victim_embed)
+        # ✅ END: Smite
 
-        #  VARROCK TELE
+        # ======================================================================
+        # 🔹 START: NEW CARD - VARROCK TELE
+        # ======================================================================
         elif selected_card['name'] == "Varrock Tele":
+            # --- PRE-CHECK: Get caster position and rolls ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             rolls_available = 0
@@ -2352,6 +2531,9 @@ async def use_card(interaction: discord.Interaction, index: int):
             if caster_pos == 10:
                 await interaction.followup.send("❌ You cannot use **Varrock Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
                 return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
+
+            # --- EFFECT ---
             new_pos = 20 # Bank Standing tile
             log_command(
                 team_name,
@@ -2360,14 +2542,20 @@ async def use_card(interaction: discord.Interaction, index: int):
             )
             embed_description = f"**{team_name}** used **Varrock Tele** and teleported to **Bank Standing** (Tile 20)!"
 
+            # Logic already exists for zero roll protection:
             if rolls_available == 0:
                 increment_rolls_available(team_name)
                 embed_description += "\n\n> 🎲 You had no rolls, so you gained one!"
 
+            # Check if they landed on a card tile (though tile 20 is not one)
             await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
+        # 🔹 END: NEW CARD - VARROCK TELE
 
-        #  POH Voucher
+        # ======================================================================
+        # 🔹 START: NEW CARD - POH Voucher
+        # ======================================================================
         elif selected_card['name'] == "POH Voucher":
+            # --- PRE-CHECK: Get caster position ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             
@@ -2380,7 +2568,10 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
                 return # Stop, card is not consumed
             
+            # --- EFFECT ---
+            # Call the function to place a house for free
             try:
+                # FIX: place_house now implemented in helpers
                 placement_successful = place_house(team_name, caster_pos, is_free=True)
 
                 if not placement_successful:
@@ -2403,8 +2594,15 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **POH Voucher**!\n\n> 🏠 Placed a **free house** on tile **{caster_pos}**!"
             
-        #  Home Tele
+        # ======================================================================
+        # 🔹 END: POH Voucher
+        # ======================================================================
+
+        # ======================================================================
+        # 🔹 START: NEW CARD - Home Tele
+        # ======================================================================
         elif selected_card['name'] == "Home Tele":
+            # --- PRE-CHECK 1: Get caster position ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             for record in all_teams_data:
@@ -2416,16 +2614,25 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
                 return # Stop, card is not consumed
 
+            # Tile 10 blocking logic
             if caster_pos == 10:
                 await interaction.followup.send("❌ You cannot use **Home Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
                 return # Stop, card is not consumed
             
-            houses = get_houses() 
-            house_owner_id = get_team_house_color(team_name) 
+            # --- PRE-CHECK 2: Find closest owned house ahead ---
+            try:
+                houses = get_houses() # FIX: get_houses now implemented in helpers
+            except Exception as e:
+                print(f"❌ Error fetching houses for Home Tele: {e}")
+                await interaction.followup.send("❌ An internal error occurred while finding houses.", ephemeral=True)
+                return
+            
+            house_owner_id = get_team_house_color(team_name) # FIX: get_team_house_color now implemented in helpers
             
             closest_house_pos = -1
             min_distance = float('inf')
             
+            # Find the closest house on a tile *ahead*
             for house in houses:
                 house_tile = house.get("tile", 0)
                 # Check for same owner/color AND tile is ahead
@@ -2440,9 +2647,11 @@ async def use_card(interaction: discord.Interaction, index: int):
                 return # Stop, card is not consumed
             
             new_pos = closest_house_pos
+            # --- END PRE-CHECK ---
 
             embed_description = f"**{team_name}** used **Home Tele**!\n\n"
 
+            # Vengeance Check (Highest Priority)
             if check_and_consume_vengeance(team_name):
                 embed_description += f"💀 But **Vengeance** was active! The teleport fizzled, and the card was consumed!"
                 if log_chan:
@@ -2454,6 +2663,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     await log_chan.send(content=f"To {team_name}:", embed=skull_embed)
             
             else:
+                # --- NO VENGEANCE, PROCEED WITH TELEPORT ---
                 log_command(
                     team_name,
                     "/card_effect_set_tile",
@@ -2461,9 +2671,14 @@ async def use_card(interaction: discord.Interaction, index: int):
                 )
                 embed_description += f"🏠 Teleported to your closest house on tile **{new_pos}**!"
                 
+                # Check if they landed on a special tile
                 await check_and_award_card_on_land(team_name, new_pos, log_chan, "teleporting to")
+        # ======================================================================
+        # 🔹 END: Home Tele
+        # ======================================================================
 
         elif selected_card['name'] == "Tele Other":
+            # --- PRE-CHECK ---
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             opponents = []
@@ -2485,16 +2700,21 @@ async def use_card(interaction: discord.Interaction, index: int):
             if not opponents:
                 await interaction.followup.send("❌ Card effect failed: There are no other teams to swap with.", ephemeral=True)
                 return # Stop, card is not consumed
+            # --- END PRE-CHECK ---
 
+            # --- TARGET SELECTION & EFFECT ---
             target = random.choice(opponents)
             target_team = target["team"]
             target_pos = target["pos"]
 
             embed_description = f"**{team_name}** used **Tele Other** on **{target_team}**!\n\n"
-
+            
+            # Vengeance Check (Highest Priority)
             if check_and_consume_vengeance(target_team):
                 embed_description += f"💀 But **{target_team}** had Vengeance active! The teleport fizzled, and both cards were consumed!"
-
+                # No swap occurs, but both cards are used.
+            
+            # Redemption Check (Second Priority)
             elif check_and_consume_redemption(target_team):
                 embed_description += f"🩵 But **{target_team}**'s Redemption activated! The teleport was cancelled!"
                 if log_chan:
@@ -2505,31 +2725,41 @@ async def use_card(interaction: discord.Interaction, index: int):
                     )
                     await log_chan.send(content=f"To {target_team}:", embed=fizzle_embed)
 
+            # Normal Effect
             else:
+                # FIX: Tele Other log now sends the command to swap positions
                 embed_description += f"🔄 **{team_name}** (from tile {caster_pos}) has swapped places with **{target_team}** (from tile {target_pos})!"
                 
+                # Log commands for Godot to process the swap
                 log_command(team_name, "/card_effect_set_tile", {"team": team_name, "tile": target_pos})
                 log_command(team_name, "/card_effect_set_tile", {"team": target_team, "tile": caster_pos})
 
+                # Check if either team landed on a special tile
                 await check_and_award_card_on_land(team_name, target_pos, log_chan, "being teleported to")
                 await check_and_award_card_on_land(target_team, caster_pos, log_chan, "being teleported to")
 
+        # --- Other Cards (default use) ---
         else:
+            # Fallback is generally okay here as other card names are descriptive
             embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
         
         
+        # --- 3. Clear Data IF NOT a status activation ---
         if not is_status_activation:
+            # Clear Wildcard Data (if any)
             if team_wildcard_value is not None:
                 wildcard_data.pop(team_name, None) # Remove team's roll/status
                 card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
                 print(f"✅ Cleared wildcard for {team_name} from card {selected_card['name']}")
             
+            # Remove Team from "Held By"
             cell_val = str(card_sheet.cell(card_row, 3).value or "")
             teams = [t.strip() for t in cell_val.split(',') if t.strip()]
             if team_name in teams:
                 teams.remove(team_name)
             card_sheet.update_cell(card_row, 3, ", ".join(teams))
             
+            # --- 4. Send Confirmation Embed ---
             if log_chan:
                 embed = discord.Embed(
                     title=f"🃏 Card Played: {selected_card['name']}",
@@ -2540,6 +2770,8 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             await interaction.followup.send(f"✅ **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
         
+        # ✅ NEW: Set "Used Card This Turn" flag
+        # This runs on ANY successful use (activation or consumption)
         set_used_card_flag(team_name, "yes")
             
     except Exception as e:
@@ -2556,7 +2788,3 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
-
-
-
