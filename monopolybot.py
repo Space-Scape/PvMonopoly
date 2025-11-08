@@ -517,6 +517,9 @@ class DropReviewButtons(ui.View):
             return
 
         try:
+            # 🔹 FIXED: Defer immediately to prevent 10062 timeout error
+            await interaction.response.defer(ephemeral=True)
+
             embed = self.message.embeds[0]
             embed.color = discord.Color.green()
             if "[Approved]" not in embed.title:
@@ -671,16 +674,30 @@ class DropReviewButtons(ui.View):
                     if self.boss in bosses_for_tile:
                         increment_rolls_available(team_name)
                         print(f"✅ Roll granted: Team {team_name} on tile {current_tile} ({self.boss})")
+                        
+                        # 🔹 NEW: Notify the team they received a roll
+                        if team_chan:
+                            roll_grant_embed = discord.Embed(
+                                title="🎲 Roll Granted!",
+                                description=(
+                                    f"Your team landed a drop (**{self.boss}**) on a valid tile (**{current_tile}**).\n"
+                                    "A free roll has been granted! Use `/roll` to use it."
+                                ),
+                                color=discord.Color.green()
+                            )
+                            await team_chan.send(embed=roll_grant_embed)
                     else:
                         print(f"❗ No roll granted: Team {team_name} on tile {current_tile}, drop boss {self.boss} not valid here.")
                 except Exception as e:
                     print(f"❌ Error checking tile before granting roll: {e}")
 
-            await interaction.response.send_message("✅ Drop approved and logged.", ephemeral=True)
+            # 🔹 FIXED: Use followup.send instead of response.send_message
+            await interaction.followup.send("✅ Drop approved and logged.", ephemeral=True)
 
         except Exception as e:
             print(f"❌ Error in approve_button: {e}")
-            await interaction.response.send_message(f"Error approving drop: {e}", ephemeral=True)
+            # 🔹 FIXED: Use followup.send instead of response.send_message
+            await interaction.followup.send(f"Error approving drop: {e}", ephemeral=True)
 
     @ui.button(label="Reject Drop", style=discord.ButtonStyle.danger, custom_id="reject_drop")
     async def reject_button(self, interaction: discord.Interaction, button: ui.Button):
@@ -2931,6 +2948,3 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
-
-
