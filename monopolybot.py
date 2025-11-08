@@ -941,14 +941,18 @@ async def roll(interaction: discord.Interaction):
 
     result = random.randint(1, 6)
     
-    log_command(
-        interaction.user.name,
-        "/roll",
-        {
-            "team": team_name,
-            "roll": result
-        }
-    )
+    # 🔹 FIXED: Do not log the /roll command.
+    # The /roll command executes the move directly in Python.
+    # Logging it was causing the Google Apps Script to run the roll
+    # a second time, resulting in a double move.
+    # log_command(
+    #     interaction.user.name,
+    #     "/roll",
+    #     {
+    #         "team": team_name,
+    #         "roll": result
+    #     }
+    # )
     
     try:
         decrement_rolls_available(team_name)
