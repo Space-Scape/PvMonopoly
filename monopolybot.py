@@ -1344,9 +1344,14 @@ async def buy_house(interaction: discord.Interaction):
     submitted_for="User you are submitting the drop for (optional)",
 )
 async def submitdrop(interaction: discord.Interaction, screenshot: discord.Attachment, submitted_for: Optional[discord.Member] = None):
-    # 🔹 FIXED: Compare as strings
+    try:
+        await interaction.response.defer(ephemeral=True)
+    except discord.NotFound:
+        print("❌ Interaction not found or timed out before defer.")
+        return
+        
     if str(interaction.channel_id) != DROP_SUBMISSION_CHANNEL_ID:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"❌ You can only use this command in the <#{DROP_SUBMISSION_CHANNEL_ID}> channel.", ephemeral=True
         )
         return
@@ -2934,3 +2939,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
