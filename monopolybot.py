@@ -946,7 +946,8 @@ async def roll(interaction: discord.Interaction):
     new_pos = raw_pos % BOARD_SIZE
     go_message = ""
     
-    # Check for Pass Go: Did they move >= BOARD_SIZE and are they not jumping to Jail (tile 30)?
+    # 1. Check for Pass Go
+    # Did they move >= BOARD_SIZE and are they not jumping to Jail (tile 30)?
     if raw_pos >= BOARD_SIZE and new_pos != 30: 
         try:
             # Update Pass Count
@@ -966,7 +967,7 @@ async def roll(interaction: discord.Interaction):
         except Exception as e:
             print(f"❌ Error updating sheet for Pass Go: {e}")
 
-    # Apply special tile movement logic (teleports) to the calculated new_pos
+    # 2. Apply special tile movement logic (teleports) to the calculated new_pos
     if new_pos == 12:
         new_pos = 28 if current_tile != 38 else 12
     elif new_pos == 28:
@@ -977,13 +978,13 @@ async def roll(interaction: discord.Interaction):
         new_pos = JAIL_TILE # Go to Jail
         go_message = "🚨 **GO TO JAIL!** You land on tile 30 and are immediately sent to tile 10."
 
-    # Update position in sheet with the final calculated position
+    # 3. Update position in sheet with the final calculated position
     try:
         team_data_sheet.update_cell(team_row_index, pos_col_index, new_pos)
     except Exception as e:
         print(f"❌ Error updating Position in sheet: {e}")
 
-    # Send roll embed and Go message
+    # 4. Send roll embed and Go message
     roll_embed = discord.Embed(
         title=f"🎲 {team_name} Rolled!",
         description=f"**{interaction.user.display_name}** rolled a **{result}**! Moving to tile **{new_pos}**.",
@@ -993,46 +994,14 @@ async def roll(interaction: discord.Interaction):
 
     if go_message:
         await interaction.channel.send(go_message)
-
-    # 4. Handle Post-Move Landings (Card Draw and Free Roll if needed)
+        
+    # 5. Handle Post-Move Landings (Card Draw and Free Roll if needed)
     if not team_chan:
         print(f"❌ Log channel {LOG_CHANNEL_ID} not found, can't send card embeds.")
         return
-        
-    # Check if landing on a tile that grants a free roll (if rolls are zero)
-    if new_pos in ROLL_GRANTING_TILES:
-        try:
-            # Re-fetch rolls just in case they were used by a card during the roll flow (though unlikely here)
-            rolls_available = get_team_rolls(team_name) 
-            
-            if rolls_available == 0:
-                increment_rolls_available(team_name)
-                tile_name = ""
-                if new_pos == GO_TILE: tile_name = "GO"
-                elif new_pos == JAIL_TILE: tile_name = "Jail (Just Visiting)"
-                elif new_pos == BANK_STANDING_TILE: tile_name = "Bank Standing"
-                elif new_pos in GLIDER_TILES: tile_name = "Glider"
-                elif new_pos in CHEST_TILES: tile_name = "Chest"
-                elif new_pos in CHANCE_TILES: tile_name = "Chance"
-                
-                roll_embed = discord.Embed(
-                    title="🎲 Free Roll Granted!",
-                    description=f"**{team_name}** landed on a **{tile_name}** tile with no rolls remaining. A free roll has been granted.",
-                    color=discord.Color.yellow()
-                )
-                await team_chan.send(embed=roll_embed)
-                print(f"🎲 Granted free roll to {team_name} upon landing on {tile_name} (pos {new_pos})")
-        except Exception as e:
-            print(f"❌ Error during roll protection check for {team_name}: {e}")
 
-    # Check for Chance/Chest card draw
-    if new_pos in CHEST_TILES:
-        print(f"❗ {team_name} landed on CHEST tile {new_pos}")
-        await team_receives_card(team_name, "Chest", team_chan)
-    elif new_pos in CHANCE_TILES:
-        print(f"❗ {team_name} landed on CHANCE tile {new_pos}")
-        await team_receives_card(team_name, "Chance", team_chan)
-
+    # This function now handles both card draws AND free roll grants
+    await check_and_award_card_on_land(team_name, new_pos, "landing on")
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
@@ -2526,3 +2495,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
