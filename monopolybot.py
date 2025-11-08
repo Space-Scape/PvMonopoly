@@ -41,6 +41,32 @@ EVENT_CAPTAIN_ROLE_ID = 1286238713210474559
 
 BOARD_SIZE = 40 # Assuming a 40-tile board
 
+# ========== CARD EMOJI MAPPING (NEW) ==========
+CARD_EMOJIS = {
+    "Escape Crystal": "<:dragonstone:1273106857933668444>", 
+    "Pickpocket": "<:thieving:1273603030423568514>",
+    "Low Alchemy": "<:gold:1273106856515901452>",
+    "High Alchemy": "<:gold:1273106856515901452>",
+    "Vengeance": "💀",
+    "Redemption": "💙",
+    "Elder Maul": "🔨",
+    "Vile Vigour": "⚕️",
+    "Varrock Tele": "🏛️",
+    "POH Voucher": "🏠",
+    "Home Tele": "🏡",
+    "Dragon Spear": "🏑",
+    "Rogue's Gloves": "🧤",
+    "Lure": "🎣",
+    "Backstab": "🗡️",
+    "Smite": "⛈️",
+    "Tele Other": "🔄",
+    
+    # Fallback for generic Chest/Chance draw
+    "Chest": "📦",
+    "Chance": "❓",
+}
+# ============================================
+
 # ========== DISCORD SETUP ==========
 intents = discord.Intents.default()
 intents.members = True
@@ -1130,6 +1156,7 @@ async def stats(interaction: discord.Interaction):
         traceback.print_exc()
         await interaction.followup.send("❌ An error occurred while fetching leaderboard data.", ephemeral=True)
         
+
 @bot.tree.command(name="buy_house", description="Attempt to buy a house on your current tile.")
 async def buy_house(interaction: discord.Interaction):
     if interaction.channel_id not in TEAM_CHANNEL_IDS:
@@ -1375,6 +1402,7 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
             chosen_card = random.choice(eligible_cards)
             card_row_index = chosen_card["index"]
             card_data = chosen_card["data"]
+            card_name = card_data.get("Name")
             card_text = card_data.get("Card Text", "")
             
             new_roll = None
@@ -1410,6 +1438,7 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
             chosen_card = random.choice(eligible_cards)
             card_row_index = chosen_card["index"]
             card_data = chosen_card["data"]
+            card_name = card_data.get("Name")
             card_text = card_data.get("Card Text", "")
             
             new_roll = None
@@ -1449,15 +1478,17 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
             new_held_by = f"{held_by_str}, {team_name}".strip(", ")
             card_sheet.update_cell(card_row_index, 3, new_held_by)
 
-        card_name = card_data.get("Name")
         card_text_display = card_data.get("Card Text")
         
         if new_roll is not None:
             card_text_display = card_text_display.replace("%d6", str(new_roll))
             card_text_display = card_text_display.replace("%d3", str(new_roll))
         
+        # 🔹 FIXED: Look up emoji using card_name
+        card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "🃏")) 
+        
         embed = discord.Embed(
-            title=f"🎴 {card_type} Card Drawn!",
+            title=f"{card_emoji} {card_type} Card Drawn!",
             description=f"**{team_name}** drew **{card_name}**!\n\n> {card_text_display}",
             color=discord.Color.gold() if card_type == "Chest" else discord.Color.blue()
         )
@@ -1490,6 +1521,7 @@ def get_held_cards(sheet_obj, team_name: str):
             held_by = str(row[held_by_col] or "")
             
             if team_name in held_by:
+                card_name = str(row[name_col] or "") # Get raw name
                 card_text = str(row[text_col] or "")
                 
                 wildcard_data_str = str(row[wildcard_col] or "{}")
@@ -1510,7 +1542,7 @@ def get_held_cards(sheet_obj, team_name: str):
                         
                 cards.append({
                     "row_index": idx,
-                    "name": str(row[name_col] or ""),
+                    "name": card_name, # Use raw name here
                     "text": card_text,
                 })
     except Exception as e:
@@ -1834,7 +1866,7 @@ async def check_and_award_card_on_land(team_name: str, new_pos: int, reason: str
                 
                 roll_embed = discord.Embed(
                     title="🎲 Free Roll Granted!",
-                    description=f"**{team_name}** landed on a **{tile_name}** tile (via {reason}) with no rolls remaining. A free roll has been granted.",
+                    description=f"**{team_name}** landed on a **{tile_name}** tile with no rolls remaining. A free roll has been granted.",
                     color=discord.Color.yellow()
                 )
                 await team_channel.send(embed=roll_embed)
@@ -1857,38 +1889,35 @@ async def show_cards(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     team_name = get_team(interaction.user)
     if not team_name:
-        await interaction.followup.send("❌ You don't have a team role assigned.", ephemeral=True) # 🔹FIX: Was ephemeral=False
+        await interaction.followup.send("❌ You don't have a team role assigned.", ephemeral=True) 
         return
 
     chest_cards = get_held_cards(chest_sheet, team_name)
     chance_cards = get_held_cards(chance_sheet, team_name)
+    all_cards = chest_cards + chance_cards
 
     if not chest_cards and not chance_cards:
-        await interaction.followup.send("❌ Your team holds no cards.", ephemeral=True) # 🔹FIX: Was ephemeral=False
+        await interaction.followup.send("❌ Your team holds no cards.", ephemeral=True) 
         return
 
     embed = discord.Embed(
-        title=f"{team_name}'s Cards",
+        title=f"🃏 {team_name}'s Cards",
         color=discord.Color.purple(),
         description="Cards currently held by your team:\n"
     )
 
-    if chest_cards:
-        for i, card in enumerate(chest_cards, start=1):
-            embed.add_field(
-                name=f"<:purp:1406234308749824051> [{i}] Chest Card — {card['name']}",
-                value=f"```{card['text']}```",
-                inline=False
-            )
-
-    offset = len(chest_cards)
-    if chance_cards:
-        for i, card in enumerate(chance_cards, start=1):
-            embed.add_field(
-                name=f"<:questioning:1287623035381350441> [{i+offset}] Chance Card — {card['name']}",
-                value=f"```{card['text']}```",
-                inline=False
-            )
+    for i, card in enumerate(all_cards, start=1):
+        # Determine card type for emoji assignment
+        card_type = "Chest" if i <= len(chest_cards) else "Chance"
+        
+        # Get the appropriate emoji for the specific card name
+        emoji = CARD_EMOJIS.get(card['name'], CARD_EMOJIS.get(card_type, "❓"))
+        
+        embed.add_field(
+            name=f"{emoji} [{i}] {card['name']}",
+            value=f"```{card['text']}```",
+            inline=False
+        )
 
     await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -1940,10 +1969,12 @@ async def use_card(interaction: discord.Interaction, index: int):
         return
     
     selected_card = all_cards[index - 1] # Convert 1-based index to 0-based
+    card_name = selected_card['name'] # Get the actual card name
     card_type = "Chest" if (index - 1) < len(chest_cards) else "Chance"
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     card_row = selected_card['row_index']
-    
+    card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "🃏")) # Get emoji for feedback
+
     stored_roll = None
     final_card_text = selected_card['text']
     
@@ -1964,7 +1995,7 @@ async def use_card(interaction: discord.Interaction, index: int):
         except Exception as e:
             print(f"❌ Error parsing wildcard for {team_name}: {e}")
 
-        if selected_card['name'] == "Vengeance":
+        if card_name == "Vengeance":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
@@ -1975,9 +2006,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
 
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
+            # 🔹 FIXED: Use specific card emoji in activation message
+            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
 
-        elif selected_card['name'] == "Redemption":
+        elif card_name == "Redemption":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
@@ -1988,9 +2020,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Redemption**!\n\n> The next negative card effect used on your team will be fizzled."
 
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Redemption**!", ephemeral=False)
+            # 🔹 FIXED: Use specific card emoji in activation message
+            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Redemption**!", ephemeral=False)
 
-        elif selected_card['name'] == "Elder Maul":
+        elif card_name == "Elder Maul":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
@@ -2001,9 +2034,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Elder Maul**!\n\n> The next negative card effect used on your team will be reduced."
 
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Elder Maul**!", ephemeral=False)
+            # 🔹 FIXED: Use specific card emoji in activation message
+            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Elder Maul**!", ephemeral=False)
 
-        elif selected_card['name'] == "Low Alchemy":
+        elif card_name == "Low Alchemy":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
@@ -2014,9 +2048,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Low Alchemy**!\n\n> Your next drop this turn will be worth **double GP**."
 
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **Low Alchemy**!", ephemeral=False)
+            # 🔹 FIXED: Use specific card emoji in activation message
+            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Low Alchemy**!", ephemeral=False)
 
-        elif selected_card['name'] == "High Alchemy":
+        elif card_name == "High Alchemy":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
                 return
@@ -2027,9 +2062,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **High Alchemy**!\n\n> Your next drop this turn will be worth **triple GP**."
 
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** activated: **High Alchemy**!", ephemeral=False)
+            # 🔹 FIXED: Use specific card emoji in activation message
+            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **High Alchemy**!", ephemeral=False)
 
-        elif selected_card['name'] == "Vile Vigour" and isinstance(team_wildcard_value, int):
+        elif card_name == "Vile Vigour" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
             
             all_teams_data = team_data_sheet.get_all_records()
@@ -2470,7 +2506,8 @@ async def use_card(interaction: discord.Interaction, index: int):
                 teams.remove(team_name)
             card_sheet.update_cell(card_row, 3, ", ".join(teams))
             
-            await interaction.followup.send(f"✅ **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
+            # 🔹 FIXED: Use specific card emoji for successful, non-status card use
+            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** used the card: **{selected_card['name']}**!", ephemeral=False)
 
         set_used_card_flag(team_name, "yes")
             
@@ -2489,4 +2526,3 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
