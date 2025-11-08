@@ -23,7 +23,7 @@ TEAM_ROLES = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5"]
 
 # 🔹 Channel and Role IDs
 # 🔹 FIXED: Define as strings for robust comparison
-DROP_SUBMISSION_CHANNEL_ID = "1436463105570771094"
+DROP_SUBMISSION_CHANNEL_ID = os.getenv("DROP_SUBMISSION_CHANNEL_ID")
 REVIEW_CHANNEL_ID = "1436465463742824499"
 LOG_CHANNEL_ID = "1436463720401211474"
 
@@ -2939,4 +2939,5 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
