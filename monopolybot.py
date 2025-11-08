@@ -1130,8 +1130,6 @@ async def stats(interaction: discord.Interaction):
         traceback.print_exc()
         await interaction.followup.send("❌ An error occurred while fetching leaderboard data.", ephemeral=True)
         
----
-
 @bot.tree.command(name="buy_house", description="Attempt to buy a house on your current tile.")
 async def buy_house(interaction: discord.Interaction):
     if interaction.channel_id not in TEAM_CHANNEL_IDS:
@@ -2491,3 +2489,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
