@@ -154,7 +154,7 @@ def has_event_captain_role(member: discord.Member) -> bool:
 
 def has_event_staff_role(member: discord.Member) -> bool:
     return any(role.id == EVENT_STAFF_ROLE_ID for role in member.roles)
-
+    
 def get_team_house_color(team_name: str) -> str:
     """
     Retrieves the team's background color hex from TeamData (column F).
@@ -932,12 +932,11 @@ async def customize(interaction: discord.Interaction):
         }
     )
     await interaction.followup.send(
-        "✅ Your customization request has been sent. The game board will update shortly.", ephemeral=True
+        "🎨 Your customization request has been sent. The game board will update shortly.", ephemeral=True
     )
 
 @bot.tree.command(name="gp", description="Check your team's current GP balance.")
 async def gp(interaction: discord.Interaction):
-    # 🔹 NEW: Channel Check
     if interaction.channel_id not in TEAM_CHANNEL_IDS:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
@@ -2738,4 +2737,5 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
