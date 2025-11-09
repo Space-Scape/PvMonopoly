@@ -61,8 +61,7 @@ CARD_EMOJIS = {
     "Backstab": "🗡️",
     "Smite": "⛈️",
     "Tele Other": "🔄",
-    
-    # Fallback for generic Chest/Chance draw
+    "Tele Block": "🌀",
     "Chest": "📦",
     "Chance": "❓",
 }
@@ -1974,14 +1973,18 @@ async def use_card(interaction: discord.Interaction, index: int):
         await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
         return
 
-    # 🔹 NEW/REFACTORED: Get GP Column Index once
     try:
         team_data_headers = team_data_sheet.row_values(1)
         gp_col_index = team_data_headers.index("GP") + 1
-    except ValueError:
-        await interaction.followup.send("❌ Data sheet error: Missing 'GP' column.", ephemeral=True)
+        teleblocked_col_index = team_data_headers.index("Teleblocked") + 1 # 🔹 NEW
+    except ValueError as e:
+        if 'GP' in str(e):
+            await interaction.followup.send("❌ Data sheet error: Missing 'GP' column.", ephemeral=True)
+        elif 'Teleblocked' in str(e): # 🔹 NEW
+            await interaction.followup.send("❌ Data sheet error: Missing 'Teleblocked' column. Please add it.", ephemeral=True)
+        else:
+            await interaction.followup.send(f"❌ Data sheet error: {e}", ephemeral=True)
         return
-    # 🔹 END REFACTOR
 
     try:
         used_card_flag = get_used_card_flag(team_name)
@@ -2004,7 +2007,6 @@ async def use_card(interaction: discord.Interaction, index: int):
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     card_row = selected_card['row_index']
     
-    # 🔹 FIXED: Get card emoji
     card_name = selected_card['name']
     card_emoji = CARD_EMOJIS.get(card_name, "✅") # Default to checkmark if not found
     
@@ -2014,7 +2016,6 @@ async def use_card(interaction: discord.Interaction, index: int):
     is_status_activation = False
     embed_description = "" # Initialize embed description
     
-    # 🔹 FIXED: Get asyncio loop for async sheet operations
     loop = asyncio.get_event_loop()
 
     try:
@@ -2042,9 +2043,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
 
-            # 🔹 FIXED: Use emoji
-            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Vengeance**!", ephemeral=False)
-
         elif card_name == "Redemption":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
@@ -2055,9 +2053,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             is_status_activation = True # Mark as activation
             
             embed_description = f"**{team_name}** used **Redemption**!\n\n> The next negative card effect used on your team will be fizzled."
-
-            # 🔹 FIXED: Use emoji
-            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Redemption**!", ephemeral=False)
 
         elif card_name == "Elder Maul":
             if team_wildcard_value == "active":
@@ -2070,9 +2065,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Elder Maul**!\n\n> The next negative card effect used on your team will be reduced."
 
-            # 🔹 FIXED: Use emoji
-            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Elder Maul**!", ephemeral=False)
-
         elif card_name == "Low Alchemy":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
@@ -2084,9 +2076,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **Low Alchemy**!\n\n> Your next drop this turn will be worth **double GP**."
             
-            # 🔹 FIXED: Use emoji
-            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **Low Alchemy**!", ephemeral=False)
-
         elif card_name == "High Alchemy":
             if team_wildcard_value == "active":
                 await interaction.followup.send("❌ This card is already active!", ephemeral=True)
@@ -2098,9 +2087,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             embed_description = f"**{team_name}** used **High Alchemy**!\n\n> Your next drop this turn will be worth **triple GP**."
             
-            # 🔹 FIXED: Use emoji
-            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** activated: **High Alchemy**!", ephemeral=False)
-
         elif card_name == "Vile Vigour" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
             
@@ -2129,7 +2115,6 @@ async def use_card(interaction: discord.Interaction, index: int):
             elif new_pos == 38: new_pos = 12 if caster_pos != 28 else 38
             elif new_pos == 30: new_pos = 10
             
-            # 🔹 FIXED: Async log
             await loop.run_in_executor(
                 None,
                 log_command,
@@ -2143,7 +2128,7 @@ async def use_card(interaction: discord.Interaction, index: int):
 
         elif card_name == "Dragon Spear" and isinstance(team_wildcard_value, int):
             stored_roll = team_wildcard_value
-            move_amount = -stored_roll # Move back
+            move_amount = -stored_roll
             
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
@@ -2164,91 +2149,52 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not targets:
                 await interaction.followup.send("❌ Card effect failed: No other teams are on your tile.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             embed_description = f"**{team_name}** used **Dragon Spear**!\n\n"
             for target_team in targets:
-
                 victim_channel = get_team_channel(target_team)
-
                 if check_and_consume_redemption(target_team):
                     embed_description += f"🩵 **{target_team}**'s Redemption activated!\n"
                     if victim_channel:
-                        fizzle_embed = discord.Embed(
-                            title="🩵 Redemption Activated!",
-                            description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Redemption** activated!",
-                            color=discord.Color.blue()
-                        )
+                        fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Redemption** activated!", color=discord.Color.blue())
                         await victim_channel.send(embed=fizzle_embed)
-                    continue # Skip to the next target
+                    continue 
                         
                 if check_and_consume_vengeance(target_team):
-                    
-                    elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
-                    final_move_amount = move_amount # This is -stored_roll
+                    elder_maul_active = check_and_consume_elder_maul(team_name)
+                    final_move_amount = move_amount
                     if elder_maul_active:
                         final_move_amount = -(max(0, stored_roll - 1))
                         embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded effect reduced.\n"
-                        # 🔹 SYNTAX FIX: Created and sent embed correctly
-                        maul_embed = discord.Embed(
-                            title="🛡️ Elder Maul Activated!",
-                            description=f"Your **Elder Maul** activated and reduced the Vengeance effect!",
-                            color=discord.Color.light_grey()
-                        )
-                        await interaction.channel.send(embed=maul_embed) # Send to caster
+                        maul_embed = discord.Embed(title="🛡️ Elder Maul Activated!", description=f"Your **Elder Maul** activated and reduced the Vengeance effect!", color=discord.Color.light_grey())
+                        await interaction.channel.send(embed=maul_embed)
                     
-                    new_pos = max(0, caster_pos + final_move_amount) # Calculate new_pos for caster
-                    # 🔹 FIXED: Async log
-                    await loop.run_in_executor(
-                        None,
-                        log_command,
-                        team_name, # Logged by the caster
-                        "/card_effect_move",
-                        {"team": team_name, "move": final_move_amount} # Move the caster
-                    )
+                    new_pos = max(0, caster_pos + final_move_amount)
+                    await loop.run_in_executor(None, log_command, team_name, "/card_effect_move", {"team": team_name, "move": final_move_amount})
                     embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
-
                     await check_and_award_card_on_land(team_name, new_pos, "being rebounded by Dragon Spear to")
-
-                    skull_embed = discord.Embed(
-                        title="💀 Vengeance Activated!",
-                        description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{abs(final_move_amount)}** spaces!",
-                        color=discord.Color.dark_red()
-                    )
+                    skull_embed = discord.Embed(title="💀 Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{abs(final_move_amount)}** spaces!", color=discord.Color.dark_red())
                     await interaction.channel.send(embed=skull_embed)
-                    continue # Skip to next target
+                    continue 
                 
                 else:
                     elder_maul_active = check_and_consume_elder_maul(target_team)
-                    final_move_amount = move_amount # This is -stored_roll
+                    final_move_amount = move_amount
                     if elder_maul_active:
-                        final_move_amount = -(max(0, stored_roll - 1)) # e.g., -3 (roll=3) becomes -2. -1 (roll=1) becomes 0.
+                        final_move_amount = -(max(0, stored_roll - 1))
                         embed_description += f"🛡️ **{target_team}**'s Elder Maul activated! Effect reduced.\n"
                         if victim_channel:
-                            maul_embed = discord.Embed(
-                                title="🛡️ Elder Maul Activated!",
-                                description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Elder Maul** reduced the effect!",
-                                color=discord.Color.light_grey()
-                            )
+                            maul_embed = discord.Embed(title="🛡️ Elder Maul Activated!", description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Elder Maul** reduced the effect!", color=discord.Color.light_grey())
                             await victim_channel.send(embed=maul_embed)
-
-                    target_pos = caster_pos 
-                    new_pos = max(0, target_pos + final_move_amount) # Calculate new_pos
-                    # 🔹 FIXED: Async log
-                    await loop.run_in_executor(
-                        None,
-                        log_command,
-                        team_name, # Logged by the caster
-                        "/card_effect_move",
-                        {"team": target_team, "move": final_move_amount} # Move the target
-                    )
-                    embed_description += f"**{target_team}** was moved back **{abs(final_move_amount)}** tiles (stops at Go)!\n"
                     
+                    target_pos = caster_pos 
+                    new_pos = max(0, target_pos + final_move_amount)
+                    await loop.run_in_executor(None, log_command, team_name, "/card_effect_move", {"team": target_team, "move": final_move_amount})
+                    embed_description += f"**{target_team}** was moved back **{abs(final_move_amount)}** tiles (stops at Go)!\n"
                     await check_and_award_card_on_land(target_team, new_pos, "being hit by Dragon Spear to")
 
-
         elif card_name == "Rogue's Gloves":
-            
             stealable_cards = []
             
             chance_data = chance_sheet.get_all_values()
@@ -2324,7 +2270,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not stealable_cards:
                 await interaction.followup.send("❌ Card effect failed: There are no eligible cards to steal.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
             stolen_card = random.choice(stealable_cards)
             victim_team = stolen_card["victim_team"]
             target_sheet = stolen_card["sheet"]
@@ -2374,7 +2320,6 @@ async def use_card(interaction: discord.Interaction, index: int):
         elif card_name == "Pickpocket":
             all_teams_data = team_data_sheet.get_all_records()
             opponents_gp = []
-
             caster_row = -1
             caster_gp = 0
 
@@ -2390,7 +2335,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not opponents_gp:
                 await interaction.followup.send("❌ Card effect failed: No other teams found.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
             
             target = max(opponents_gp, key=lambda x: x["gp"])
             target_team = target["team"]
@@ -2398,90 +2343,62 @@ async def use_card(interaction: discord.Interaction, index: int):
             target_row = target["row"]
             
             steal_amount = 0
-            if target_gp >= 30_000_000:
-                steal_amount = 30_000_000
-            elif target_gp >= 15_000_000:
-                steal_amount = 15_000_000
-            elif target_gp >= 5_000_000:
-                steal_amount = 5_000_000
+            if target_gp >= 30_000_000: steal_amount = 30_000_000
+            elif target_gp >= 15_000_000: steal_amount = 15_000_000
+            elif target_gp >= 5_000_000: steal_amount = 5_000_000
             
             if steal_amount == 0:
                 await interaction.followup.send("❌ Card effect failed: No teams have enough wealth to steal from (min 5M GP).", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             embed_description = f"**{team_name}** used **Pickpocket** on **{target_team}**!\n\n"
-            
             victim_channel = get_team_channel(target_team)
 
             if check_and_consume_redemption(target_team):
                 embed_description += f"🩵 **{target_team}**'s Redemption activated!"
                 if victim_channel:
-                    fizzle_embed = discord.Embed(
-                        title="🩵 Redemption Activated!",
-                        description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Redemption** activated!",
-                        color=discord.Color.blue()
-                    )
+                    fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
             
             elif check_and_consume_vengeance(target_team):
-                
-                elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
+                elder_maul_active = check_and_consume_elder_maul(team_name)
                 final_steal_amount = steal_amount
                 if elder_maul_active:
-                    final_steal_amount = steal_amount // 2 # Halved
+                    final_steal_amount = steal_amount // 2
                     embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded loss halved.\n"
-                    maul_embed = discord.Embed(
-                        title="🛡️ Elder Maul Activated!",
-                        description=f"Your **Elder Maul** activated and halved the GP you lost from Vengeance!",
-                        color=discord.Color.light_grey()
-                    )
-                    await interaction.channel.send(embed=maul_embed) # Send to caster
+                    maul_embed = discord.Embed(title="🛡️ Elder Maul Activated!", description=f"Your **Elder Maul** activated and halved the GP you lost from Vengeance!", color=discord.Color.light_grey())
+                    await interaction.channel.send(embed=maul_embed)
                 
                 new_caster_gp = max(0, caster_gp - final_steal_amount)
-                new_target_gp = target_gp + final_steal_amount # Target GAINS the money
+                new_target_gp = target_gp + final_steal_amount
                 
-                # 🔹 FIXED: Use dynamic gp_col_index
                 team_data_sheet.update_cell(caster_row, gp_col_index, new_caster_gp)
                 team_data_sheet.update_cell(target_row, gp_col_index, new_target_gp)
 
                 embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n**{team_name}** loses **{final_steal_amount:,} GP**!"
-                skull_embed = discord.Embed(
-                    title="💀 Vengeance Activated!",
-                    description=f"You activated **{target_team}**'s Vengeance!\nYou lose **{final_steal_amount:,} GP**!",
-                    color=discord.Color.dark_red()
-                )
+                skull_embed = discord.Embed(title="💀 Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYou lose **{final_steal_amount:,} GP**!", color=discord.Color.dark_red())
                 await interaction.channel.send(embed=skull_embed)
 
             else:
-                
                 elder_maul_active = check_and_consume_elder_maul(target_team)
                 final_steal_amount = steal_amount
                 if elder_maul_active:
-                    final_steal_amount = steal_amount // 2 # Halved
+                    final_steal_amount = steal_amount // 2
                     embed_description += f"🛡️ **{target_team}**'s Elder Maul activated! Steal amount halved.\n"
                     if victim_channel:
-                        maul_embed = discord.Embed(
-                            title="🛡️ Elder Maul Activated!",
-                            description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Elder Maul** reduced the amount stolen!",
-                            color=discord.Color.light_grey()
-                        )
+                        maul_embed = discord.Embed(title="🛡️ Elder Maul Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Elder Maul** reduced the amount stolen!", color=discord.Color.light_grey())
                         await victim_channel.send(embed=maul_embed)
                 
                 new_caster_gp = caster_gp + final_steal_amount
                 new_target_gp = target_gp - final_steal_amount
                 
-                # 🔹 FIXED: Use dynamic gp_col_index
                 team_data_sheet.update_cell(caster_row, gp_col_index, new_caster_gp)
                 team_data_sheet.update_cell(target_row, gp_col_index, new_target_gp)
 
                 embed_description += f"💰 Stole **{final_steal_amount:,} GP** from **{target_team}**!"
                 
                 if victim_channel:
-                    victim_embed = discord.Embed(
-                        title="‼️ GP Stolen!",
-                        description=f"**{team_name}** used **Pickpocket** and stole **{final_steal_amount:,} GP** from your team!",
-                        color=discord.Color.dark_red()
-                    )
+                    victim_embed = discord.Embed(title="‼️ GP Stolen!", description=f"**{team_name}** used **Pickpocket** and stole **{final_steal_amount:,} GP** from your team!", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
 
         elif card_name == "Lure":
@@ -2509,7 +2426,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not opponents_ahead:
                 await interaction.followup.send("❌ Card effect failed: No opponents are ahead of you.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             sorted_opponents = sorted(opponents_ahead, key=lambda x: x[1])
             target_team = sorted_opponents[0][0]
@@ -2520,11 +2437,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             if check_and_consume_redemption(target_team):
                 embed_description = f"**{team_name}** tried to use **Lure** on **{target_team}**...\n\n🩵 But **{target_team}**'s Redemption activated!"
                 if victim_channel:
-                    fizzle_embed = discord.Embed(
-                        title="🩵 Redemption Activated!",
-                        description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated!",
-                        color=discord.Color.blue()
-                    )
+                    fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
             
             else:
@@ -2538,6 +2451,9 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await check_and_award_card_on_land(target_team, caster_pos, "being lured to")
 
         elif card_name == "Escape Crystal":
+            if get_teleblock_status(team_name) == "yes":
+                await interaction.followup.send("🌀 You are Teleblocked! You cannot use this card, even in jail!", ephemeral=True)
+                return 
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             for record in all_teams_data:
@@ -2547,7 +2463,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos != 10:
                 await interaction.followup.send("❌ You can only use the **Escape Crystal** on tile 10 (Nex/Gauntlet).", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             increment_rolls_available(team_name)
             embed_description = f"**{team_name}** used the **Escape Crystal** on tile 10!\n\n> 🎲 You have gained a free roll!"
@@ -2566,7 +2482,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             for record in all_teams_data:
                 opponent_team_name = record.get("Team")
@@ -2579,11 +2495,11 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not opponents_ahead:
                 await interaction.followup.send("❌ Card effect failed: No opponents are ahead of you.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             sorted_opponents = sorted(opponents_ahead, key=lambda x: x[1])
             target_team = sorted_opponents[0][0]
-            target_pos = sorted_opponents[0][1] # Target's current position
+            target_pos = sorted_opponents[0][1] 
             
             embed_description = f"**{team_name}** used **Backstab**!\n\n"
             
@@ -2592,72 +2508,42 @@ async def use_card(interaction: discord.Interaction, index: int):
             if check_and_consume_redemption(target_team):
                 embed_description += f"🩵 **{target_team}**'s Redemption activated!"
                 if victim_channel:
-                    fizzle_embed = discord.Embed(
-                        title="🩵 Redemption Activated!",
-                        description=f"**{team_name}** tried to use **Backstab** on you, but your **Redemption** activated!",
-                        color=discord.Color.blue()
-                    )
+                    fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Backstab** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
             
             elif check_and_consume_vengeance(target_team):
                 
-                elder_maul_active = check_and_consume_elder_maul(team_name) # Check caster
+                elder_maul_active = check_and_consume_elder_maul(team_name) 
                 final_roll_val = stored_roll
                 if elder_maul_active:
                     final_roll_val = max(0, stored_roll - 1)
                     embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded effect reduced.\n"
-                    maul_embed = discord.Embed(
-                        title="🛡️ Elder Maul Activated!",
-                        description=f"Your **Elder Maul** activated and reduced the Vengeance effect!",
-                        color=discord.Color.light_grey()
-                    )
-                    await interaction.channel.send(embed=maul_embed) # Send to caster
+                    maul_embed = discord.Embed(title="🛡️ Elder Maul Activated!", description=f"Your **Elder Maul** activated and reduced the Vengeance effect!", color=discord.Color.light_grey())
+                    await interaction.channel.send(embed=maul_embed) 
                 
                 new_pos = max(0, caster_pos - final_roll_val)
                 
-                # 🔹 FIXED: Async log
-                await loop.run_in_executor(
-                    None,
-                    log_command,
-                    team_name, # Logged by the caster
-                    "/card_effect_set_tile",
-                    {"team": team_name, "tile": new_pos} # Move the caster
-                )
+                await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
                 embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n"
                 
                 await check_and_award_card_on_land(team_name, new_pos, "being rebounded by Backstab to")
 
-                skull_embed = discord.Embed(
-                    title="💀 Vengeance Activated!",
-                    description=f"You activated **{target_team}**'s Vengeance!\nYour team was moved to tile **{new_pos}**!",
-                    color=discord.Color.dark_red()
-                )
+                skull_embed = discord.Embed(title="💀 Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYour team was moved to tile **{new_pos}**!", color=discord.Color.dark_red())
                 await interaction.channel.send(embed=skull_embed)
             
             else:
                 elder_maul_active = check_and_consume_elder_maul(target_team)
-                final_roll_val = stored_roll # This is the positive roll value
+                final_roll_val = stored_roll 
                 if elder_maul_active:
                     final_roll_val = max(0, stored_roll - 1)
                     embed_description += f"🛡️ **{target_team}**'s Elder Maul activated! Effect reduced.\n"
                     if victim_channel:
-                        maul_embed = discord.Embed(
-                            title="🛡️ Elder Maul Activated!",
-                            description=f"**{team_name}** tried to use **Backstab** on you, but your **Elder Maul** reduced the effect!",
-                            color=discord.Color.light_grey()
-                        )
+                        maul_embed = discord.Embed(title="🛡️ Elder Maul Activated!", description=f"**{team_name}** tried to use **Backstab** on you, but your **Elder Maul** reduced the effect!", color=discord.Color.light_grey())
                         await victim_channel.send(embed=maul_embed)
 
-                new_pos = max(0, target_pos - final_roll_val) # 🔹 FIXED: Target moves back from their position, not caster's
+                new_pos = max(0, target_pos - final_roll_val) 
                 
-                # 🔹 FIXED: Async log
-                await loop.run_in_executor(
-                    None,
-                    log_command,
-                    team_name,
-                    "/card_effect_set_tile",
-                    {"team": target_team, "tile": new_pos}
-                )
+                await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": target_team, "tile": new_pos})
                 embed_description += f"🔪 **{target_team}** (on tile {target_pos}) was moved back **{final_roll_val}** tiles to tile {new_pos}!"
 
                 await check_and_award_card_on_land(target_team, new_pos, "being backstabbed to")
@@ -2673,13 +2559,13 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             target_tiles = [caster_pos - 1, caster_pos, caster_pos + 1]
             if caster_pos == 0:
-                target_tiles = [0, 1, BOARD_SIZE - 1] # Handle edge case at GO
+                target_tiles = [0, 1, BOARD_SIZE - 1] 
             elif caster_pos == BOARD_SIZE - 1:
-                target_tiles = [BOARD_SIZE - 1, BOARD_SIZE - 2, 0] # Handle edge case at last tile
+                target_tiles = [BOARD_SIZE - 1, BOARD_SIZE - 2, 0] 
 
             valid_targets = []
             for record in all_teams_data:
@@ -2693,7 +2579,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not valid_targets:
                 await interaction.followup.send("❌ Card effect failed: No opponents are within 1 tile of you.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             victim_team = random.choice(valid_targets)
             embed_description = f"**{team_name}** used **Smite** on **{victim_team}**!\n\n"
@@ -2708,16 +2594,12 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if not non_active_cards:
                 await interaction.followup.send(f"❌ Card effect failed: **{victim_team}** has no cards that can be removed.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             if check_and_consume_redemption(victim_team):
-                embed_description += f"🩵 **{victim_team}**'s Redemption activated!"
+                embed_description += f"🩵 **{target_team}**'s Redemption activated!"
                 if victim_channel:
-                    fizzle_embed = discord.Embed(
-                        title="🩵 Redemption Activated!",
-                        description=f"**{team_name}** tried to use **Smite** on you, but your **Redemption** activated!",
-                        color=discord.Color.blue()
-                    )
+                    fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Smite** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
             
             elif check_and_consume_vengeance(victim_team):
@@ -2751,11 +2633,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                     
                     embed_description += f"**{team_name}** lost their **{card_to_remove['name']}** card!"
                     
-                    skull_embed = discord.Embed(
-                        title="💀 Vengeance Activated!",
-                        description=f"You activated **{victim_team}**'s Vengeance!\nYou lost your **{card_to_remove['name']}** card!",
-                        color=discord.Color.dark_red()
-                    )
+                    skull_embed = discord.Embed(title="💀 Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nYou lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
                     await interaction.channel.send(embed=skull_embed)
 
             else:
@@ -2780,14 +2658,14 @@ async def use_card(interaction: discord.Interaction, index: int):
                 embed_description += f"⛈️ **{victim_team}** was smote and lost their **{card_to_remove['name']}** card!"
                 
                 if victim_channel:
-                    victim_embed = discord.Embed(
-                        title="‼️ Card Lost!",
-                        description=f"**{team_name}** used **Smite**! Your team lost your **{card_to_remove['name']}** card!",
-                        color=discord.Color.dark_red()
-                    )
+                    victim_embed = discord.Embed(title="‼️ Card Lost!", description=f"**{team_name}** used **Smite**! Your team lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
 
         elif card_name == "Varrock Tele":
+            if get_teleblock_status(team_name) == "yes":
+                await interaction.followup.send("🌀 You are Teleblocked! You cannot use this card.", ephemeral=True)
+                return 
+
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             rolls_available = 0
@@ -2799,17 +2677,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == 10:
                 await interaction.followup.send("❌ You cannot use **Varrock Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
-            new_pos = BANK_STANDING_TILE # Bank Standing tile
-            # 🔹 FIXED: Async log
-            await loop.run_in_executor(
-                None,
-                log_command,
-                team_name,
-                "/card_effect_set_tile",
-                {"team": team_name, "tile": new_pos}
-            )
+            new_pos = BANK_STANDING_TILE 
+            await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
             embed_description = f"**{team_name}** used **Varrock Tele** and teleported to **Bank Standing** (Tile 20)!"
 
             if rolls_available == 0:
@@ -2829,20 +2700,17 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
             
-            # 🔹 FIXED: Async log
-            await loop.run_in_executor(
-                None,
-                log_command,
-                team_name,
-                "/card_effect_place_house_free",
-                {"team": team_name, "tile": caster_pos}
-            )
+            await loop.run_in_executor(None, log_command, team_name, "/card_effect_place_house_free", {"team": team_name, "tile": caster_pos})
             
             embed_description = f"**{team_name}** used **POH Voucher**!\n\n> 🏠 Placed a **free house** on tile **{caster_pos}**!"
             
         elif card_name == "Home Tele":
+            if get_teleblock_status(team_name) == "yes":
+                await interaction.followup.send("🌀 You are Teleblocked! You cannot use this card.", ephemeral=True)
+                return 
+
             all_teams_data = team_data_sheet.get_all_records()
             caster_pos = -1
             for record in all_teams_data:
@@ -2852,15 +2720,14 @@ async def use_card(interaction: discord.Interaction, index: int):
 
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return  # Stop, card is not consumed
+                return  
 
-            # Tile 10 blocking logic
             if caster_pos == 10:
                 await interaction.followup.send("❌ You cannot use **Home Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
-                return  # Stop, card is not consumed
+                return  
 
             try:
-                houses = get_houses()  # Uses helper
+                houses = get_houses()
             except Exception as e:
                 print(f"❌ Error fetching houses for Home Tele: {e}")
                 await interaction.followup.send("❌ An internal error occurred while finding houses.", ephemeral=True)
@@ -2879,22 +2746,12 @@ async def use_card(interaction: discord.Interaction, index: int):
 
             if closest_house_pos == -1:
                 await interaction.followup.send("❌ Card effect failed: No house tiles are ahead of you on the board.", ephemeral=True)
-                return  # Stop, card is not consumed
+                return  
 
             new_pos = closest_house_pos
-
             embed_description = f"**{team_name}** used **Home Tele**!\n\n"
             embed_description += f"🏠 Teleported to the **nearest house tile ahead** (tile **{new_pos}**)."
-
-            # 🔹 FIXED: Async log
-            await loop.run_in_executor(
-                None,
-                log_command,
-                team_name,
-                "/card_effect_set_tile",
-                {"team": team_name, "tile": new_pos}
-            )
-
+            await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
             await check_and_award_card_on_land(team_name, new_pos, "teleporting to")
 
         elif card_name == "Tele Other":
@@ -2914,18 +2771,16 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == 10:
                 await interaction.followup.send("❌ You cannot use **Tele Other** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             if not opponents:
                 await interaction.followup.send("❌ Card effect failed: There are no other teams to swap with.", ephemeral=True)
-                return # Stop, card is not consumed
+                return 
 
             target = random.choice(opponents)
             target_team = target["team"]
             target_pos = target["pos"]
-
             victim_channel = get_team_channel(target_team)
-
             embed_description = f"**{team_name}** used **Tele Other** on **{target_team}**!\n\n"
             
             if check_and_consume_vengeance(target_team):
@@ -2934,39 +2789,72 @@ async def use_card(interaction: discord.Interaction, index: int):
             elif check_and_consume_redemption(target_team):
                 embed_description += f"🩵 But **{target_team}**'s Redemption activated! The teleport was cancelled!"
                 if victim_channel:
-                    fizzle_embed = discord.Embed(
-                        title="🩵 Redemption Activated!",
-                        description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!",
-                        color=discord.Color.blue()
-                    )
+                    fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
 
             else:
                 embed_description += f"🔄 **{team_name}** (from tile {caster_pos}) has swapped places with **{target_team}** (from tile {target_pos})!"
                 
-                # 🔹 FIXED: Async logs
                 await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": target_pos})
                 await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": target_team, "tile": caster_pos})
 
-                # 🔹 FIXED: Add victim notification
                 if victim_channel:
-                    swap_embed = discord.Embed(
-                        title="🔄 You've Been Swapped!",
-                        description=f"**{team_name}** used **Tele Other** and swapped places with your team!\n"
-                                    f"Your team is now on **Tile {caster_pos}**.",
-                        color=discord.Color.orange()
-                    )
+                    swap_embed = discord.Embed(title="🔄 You've Been Swapped!", description=f"**{team_name}** used **Tele Other** and swapped places with your team!\nYour team is now on **Tile {caster_pos}**.", color=discord.Color.orange())
                     await victim_channel.send(embed=swap_embed)
 
                 await check_and_award_card_on_land(team_name, target_pos, "being teleported to")
                 await check_and_award_card_on_land(target_team, caster_pos, "being teleported to")
+
+        elif card_name == "Tele Block":
+            all_teams_data = team_data_sheet.get_all_records()
+            caster_pos = -1
+            opponents_on_tile = []
+
+            for record in all_teams_data:
+                current_team_name = record.get("Team")
+                current_pos = int(record.get("Position", -1))
+                
+                if current_team_name == team_name:
+                    caster_pos = current_pos
+                elif current_team_name:
+                    opponents_on_tile.append((current_team_name, current_pos))
+
+            opponents_on_tile = [team for team, pos in opponents_on_tile if pos == caster_pos]
+
+            if not opponents_on_tile:
+                await interaction.followup.send("❌ Card effect failed: No opponents are on your tile to Tele Block.", ephemeral=True)
+                return 
+            
+            target_team = random.choice(opponents_on_tile)
+            embed_description = f"**{team_name}** used **Tele Block** on **{target_team}**!\n\n"
+            victim_channel = get_team_channel(target_team)
+
+            if check_and_consume_redemption(target_team):
+                embed_description += f"🩵 But **{target_team}**'s Redemption activated! The effect fizzled!"
+                if victim_channel:
+                    fizzle_embed = discord.Embed(title="🩵 Redemption Activated!", description=f"**{team_name}** tried to use **Tele Block** on you, but your **Redemption** activated!", color=discord.Color.blue())
+                    await victim_channel.send(embed=fizzle_embed)
+
+            elif check_and_consume_vengeance(target_team):
+                embed_description += f"💀 **{target_team}** had Vengeance! The effect was rebounded!\n**{team_name}** is now Teleblocked!"
+                set_teleblock_status(team_name, "yes") 
+                skull_embed = discord.Embed(title="💀 Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYour team is now **Teleblocked**!", color=discord.Color.dark_red())
+                await interaction.channel.send(embed=skull_embed) 
+
+            else:
+                embed_description += f"🌀 **{target_team}** is now **Teleblocked**! They cannot use teleport cards until after their next roll."
+                set_teleblock_status(target_team, "yes") 
+
+                if victim_channel:
+                    tb_embed = discord.Embed(title="🌀 You are Teleblocked!", description=f"**{team_name}** used **Tele Block** on your team! You cannot use teleport cards until after your next roll.", color=discord.Color.dark_purple())
+                    await victim_channel.send(embed=tb_embed)
 
         else:
             embed_description = f"**{team_name}** used the {card_type} card:\n\n> {final_card_text}"
         
         if not is_status_activation:
             if team_wildcard_value is not None:
-                wildcard_data.pop(team_name, None) # Remove team's roll/status
+                wildcard_data.pop(team_name, None) 
                 card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
                 print(f"✅ Cleared wildcard for {team_name} from card {selected_card['name']}")
             
@@ -2976,8 +2864,20 @@ async def use_card(interaction: discord.Interaction, index: int):
                 teams.remove(team_name)
             card_sheet.update_cell(card_row, 3, ", ".join(teams))
             
-            # 🔹 FIXED: Use emoji
-            await interaction.followup.send(f"{card_emoji} **{interaction.user.display_name}** used the card: **{card_name}**!", ephemeral=False)
+            embed = discord.Embed(
+                title=f"{card_emoji} {team_name} used {card_name}!",
+                description=embed_description,
+                color=discord.Color.blue()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+
+        if is_status_activation:
+            embed = discord.Embed(
+                title=f"{card_emoji} {team_name} activated {card_name}!",
+                description=embed_description,
+                color=discord.Color.green()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
 
         set_used_card_flag(team_name, "yes")
             
@@ -2996,3 +2896,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
