@@ -883,6 +883,11 @@ async def roll(interaction: discord.Interaction):
         await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
         return
         
+    # ---------------------------
+    # 🔹 NEW: Clear Teleblock Status
+    # ---------------------------
+    set_teleblock_status(team_name, "no")
+    
     team_chan = get_team_channel(team_name)
     log_chan = bot.get_channel(int(LOG_CHANNEL_ID)) # 🔹 FIXED: Cast to int
 
@@ -940,34 +945,15 @@ async def roll(interaction: discord.Interaction):
 
     result = random.randint(1, 6)
     
-    # 🔹 FIXED: Do not log the /roll command.
-    # The /roll command executes the move directly in Python.
-    # Logging it was causing the Google Apps Script to run the roll
-    # a second time, resulting in a double move.
-    # log_command(
-    #     interaction.user.name,
-    #     "/roll",
-    #     {
-    #         "team": team_name,
-    #         "roll": result
-    #     }
-    # )
-    
     try:
         decrement_rolls_available(team_name)
     except Exception as e:
         print(f"❌ Error decrementing rolls from /roll command: {e}")
 
-    # =========================================================================
-    # 🔹 FIXED: Pass Go Logic (Single, correct block)
-    # =========================================================================
-    
     raw_pos = current_tile + result
     new_pos = raw_pos % BOARD_SIZE
     go_message = ""
     
-    # 1. Check for Pass Go
-    # Did they move >= BOARD_SIZE and are they not jumping to Jail (tile 30)?
     if raw_pos >= BOARD_SIZE and new_pos != 30: 
         try:
             # Update Pass Count
@@ -1022,10 +1008,6 @@ async def roll(interaction: discord.Interaction):
 
     # This function now handles both card draws AND free roll grants
     await check_and_award_card_on_land(team_name, new_pos, "landing on")
-    # =========================================================================
-    # 🔹 END: Roll Logic
-    # =========================================================================
-
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
@@ -2896,4 +2878,5 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
