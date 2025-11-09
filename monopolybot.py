@@ -1405,8 +1405,8 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-        await team_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
-        return
+                await team_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
+                return
                 
             chosen_card = random.choice(eligible_cards)
             card_row_index = chosen_card["index"]
