@@ -1039,13 +1039,17 @@ async def customize(interaction: discord.Interaction):
 
     await interaction.response.defer(ephemeral=True) # Defer the response
     team_name = get_team(interaction.user) or "*No team*"
-    log_command(
+    
+    # 🔹 FIXED: Run blocking sheet I/O in an executor
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None,
+        log_command,
         interaction.user.name,
         "/customize",
-        {
-            "team": team_name
-        }
+        {"team": team_name}
     )
+    
     await interaction.followup.send(
         "🎨 Your customization request has been sent. The game board will update shortly.", ephemeral=True
     )
@@ -1401,8 +1405,8 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                await team_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
-                return
+        await team_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
+        return
                 
             chosen_card = random.choice(eligible_cards)
             card_row_index = chosen_card["index"]
@@ -1479,7 +1483,7 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
 
             held_by_str = str(card_sheet.cell(card_row_index, 3).value or "")
             new_held_by = f"{held_by_str}, {team_name}".strip(", ")
-            card_sheet.update_cell(card_row_index, 3, new_held_by)
+            card_sheet.update_cell(card_row_index, 3, ", ".join(teams))
 
         card_name = card_data.get("Name")
         card_text_display = card_data.get("Card Text")
@@ -1773,6 +1777,9 @@ def clear_all_active_statuses(team_name: str):
     """
     Finds and clears all "active" statuses for a given team
     from both card sheets. This is called at the start of a team's turn.
+    
+    🔹 FIXED: Will no longer clear Alchemy cards, as those are
+    consumed on use, not at the start of a turn.
     """
     print(f"❗ Clearing all active statuses for {team_name}...")
     sheets_to_check = [chance_sheet, chest_sheet]
@@ -1791,6 +1798,11 @@ def clear_all_active_statuses(team_name: str):
 
             for i, row in enumerate(data[1:], start=2):
                 if len(row) <= max(name_col, held_by_col, wildcard_col):
+                    continue
+                
+                # 🔹 FIXED: Skip Alchemy cards
+                card_name = row[name_col]
+                if card_name in ("Low Alchemy", "High Alchemy"):
                     continue
                 
                 wildcard_str = str(row[wildcard_col] or "{}")
@@ -1993,6 +2005,9 @@ async def use_card(interaction: discord.Interaction, index: int):
     
     is_status_activation = False
     embed_description = "" # Initialize embed description
+    
+    # 🔹 FIXED: Get asyncio loop for async sheet operations
+    loop = asyncio.get_event_loop()
 
     try:
         wildcard_data_str = card_sheet.cell(card_row, 4).value or "{}"
@@ -2106,7 +2121,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             elif new_pos == 38: new_pos = 12 if caster_pos != 28 else 38
             elif new_pos == 30: new_pos = 10
             
-            log_command(
+            # 🔹 FIXED: Async log
+            await loop.run_in_executor(
+                None,
+                log_command,
                 team_name,  
                 "/card_effect_move",  
                 {"team": team_name, "move": stored_roll}
@@ -2165,13 +2183,13 @@ async def use_card(interaction: discord.Interaction, index: int):
                         embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded effect reduced.\n"
                         maul_embed = discord.Embed(
                             title="🛡️ Elder Maul Activated!",
-                            description=f"Your **Elder Maul** activated and reduced the Vengeance effect!",
-                            color=discord.Color.light_grey()
-                        )
-                        await interaction.channel.send(embed=maul_embed) # Send to caster
+                        await maul_embed) # Send to caster
                     
                     new_pos = max(0, caster_pos + final_move_amount) # Calculate new_pos for caster
-                    log_command(
+                    # 🔹 FIXED: Async log
+                    await loop.run_in_executor(
+                        None,
+                        log_command,
                         team_name, # Logged by the caster
                         "/card_effect_move",
                         {"team": team_name, "move": final_move_amount} # Move the caster
@@ -2204,7 +2222,10 @@ async def use_card(interaction: discord.Interaction, index: int):
 
                     target_pos = caster_pos 
                     new_pos = max(0, target_pos + final_move_amount) # Calculate new_pos
-                    log_command(
+                    # 🔹 FIXED: Async log
+                    await loop.run_in_executor(
+                        None,
+                        log_command,
                         team_name, # Logged by the caster
                         "/card_effect_move",
                         {"team": target_team, "move": final_move_amount} # Move the target
@@ -2582,7 +2603,10 @@ async def use_card(interaction: discord.Interaction, index: int):
                 
                 new_pos = max(0, caster_pos - final_roll_val)
                 
-                log_command(
+                # 🔹 FIXED: Async log
+                await loop.run_in_executor(
+                    None,
+                    log_command,
                     team_name, # Logged by the caster
                     "/card_effect_set_tile",
                     {"team": team_name, "tile": new_pos} # Move the caster
@@ -2614,7 +2638,10 @@ async def use_card(interaction: discord.Interaction, index: int):
 
                 new_pos = max(0, target_pos - final_roll_val) # 🔹 FIXED: Target moves back from their position, not caster's
                 
-                log_command(
+                # 🔹 FIXED: Async log
+                await loop.run_in_executor(
+                    None,
+                    log_command,
                     team_name,
                     "/card_effect_set_tile",
                     {"team": target_team, "tile": new_pos}
@@ -2763,7 +2790,10 @@ async def use_card(interaction: discord.Interaction, index: int):
                 return # Stop, card is not consumed
 
             new_pos = BANK_STANDING_TILE # Bank Standing tile
-            log_command(
+            # 🔹 FIXED: Async log
+            await loop.run_in_executor(
+                None,
+                log_command,
                 team_name,
                 "/card_effect_set_tile",
                 {"team": team_name, "tile": new_pos}
@@ -2789,22 +2819,10 @@ async def use_card(interaction: discord.Interaction, index: int):
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
                 return # Stop, card is not consumed
             
-            try:
-                placement_successful = place_house(team_name, caster_pos, is_free=True)
-
-                if not placement_successful:
-                    await interaction.followup.send(
-                        "❌ Card effect failed: A house could not be placed on this tile (e.g., not a property tile or already owned).", 
-                        ephemeral=True
-                    )
-                    return # Stop, card is not consumed
-                
-            except Exception as e:
-                print(f"❌ Error placing house for POH Voucher: {e}")
-                await interaction.followup.send("❌ An internal error occurred during house placement.", ephemeral=True)
-                return # Stop, card is not consumed
-            
-            log_command(
+            # 🔹 FIXED: Async log
+            await loop.run_in_executor(
+                None,
+                log_command,
                 team_name,
                 "/card_effect_place_house_free",
                 {"team": team_name, "tile": caster_pos}
@@ -2856,7 +2874,10 @@ async def use_card(interaction: discord.Interaction, index: int):
             embed_description = f"**{team_name}** used **Home Tele**!\n\n"
             embed_description += f"🏠 Teleported to the **nearest house tile ahead** (tile **{new_pos}**)."
 
-            log_command(
+            # 🔹 FIXED: Async log
+            await loop.run_in_executor(
+                None,
+                log_command,
                 team_name,
                 "/card_effect_set_tile",
                 {"team": team_name, "tile": new_pos}
@@ -2911,8 +2932,19 @@ async def use_card(interaction: discord.Interaction, index: int):
             else:
                 embed_description += f"🔄 **{team_name}** (from tile {caster_pos}) has swapped places with **{target_team}** (from tile {target_pos})!"
                 
-                log_command(team_name, "/card_effect_set_tile", {"team": team_name, "tile": target_pos})
-                log_command(team_name, "/card_effect_set_tile", {"team": target_team, "tile": caster_pos})
+                # 🔹 FIXED: Async logs
+                await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": target_pos})
+                await loop.run_in_executor(None, log_command, team_name, "/card_effect_set_tile", {"team": target_team, "tile": caster_pos})
+
+                # 🔹 FIXED: Add victim notification
+                if victim_channel:
+                    swap_embed = discord.Embed(
+                        title="🔄 You've Been Swapped!",
+                        description=f"**{team_name}** used **Tele Other** and swapped places with your team!\n"
+                                    f"Your team is now on **Tile {caster_pos}**.",
+                        color=discord.Color.orange()
+                    )
+                    await victim_channel.send(embed=swap_embed)
 
                 await check_and_award_card_on_land(team_name, target_pos, "being teleported to")
                 await check_and_award_card_on_land(target_team, caster_pos, "being teleported to")
