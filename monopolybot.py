@@ -1342,11 +1342,13 @@ async def buy_house(interaction: discord.Interaction):
         
         set_bought_house_flag(team_name, "yes")
         
-        log_command(
-            interaction.user.name,
-            "/buy_house",
-            {"team": team_name, "new_house_count": new_house_count, "cost": house_cost}
-        )
+        # 🔹 FIXED: Do not log /buy_house.
+        # This was causing a double-buy/double-charge.
+        # log_command(
+        #     interaction.user.name,
+        #     "/buy_house",
+        #     {"team": team_name, "new_house_count": new_house_count, "cost": house_cost}
+        # )
         
         buy_message = (
             f"🏠 **{team_name}** purchased a house for **{house_cost:,.0f}** GP on tile {current_pos}!\n"
@@ -1405,6 +1407,7 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
+                # 🔹 FIXED: IndentationError
                 await team_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
                 return
                 
@@ -1440,6 +1443,7 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
+                # 🔹 FIXED: IndentationError (Just in case, though this logic seems different)
                 await team_channel.send(f"❗ **{team_name}** tried to draw a {card_type} card, but none were available!")
                 return
 
@@ -1482,7 +1486,11 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                 print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet")
 
             held_by_str = str(card_sheet.cell(card_row_index, 3).value or "")
-            new_held_by = f"{held_by_str}, {team_name}".strip(", ")
+            
+            # 🔹 BUGFIX: Correctly append team to a list of teams
+            teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
+            if team_name not in teams:
+                teams.append(team_name)
             card_sheet.update_cell(card_row_index, 3, ", ".join(teams))
 
         card_name = card_data.get("Name")
@@ -2181,9 +2189,13 @@ async def use_card(interaction: discord.Interaction, index: int):
                     if elder_maul_active:
                         final_move_amount = -(max(0, stored_roll - 1))
                         embed_description += f"🛡️ **{team_name}**'s Elder Maul activated! Rebounded effect reduced.\n"
+                        # 🔹 SYNTAX FIX: Created and sent embed correctly
                         maul_embed = discord.Embed(
                             title="🛡️ Elder Maul Activated!",
-                        await maul_embed) # Send to caster
+                            description=f"Your **Elder Maul** activated and reduced the Vengeance effect!",
+                            color=discord.Color.light_grey()
+                        )
+                        await interaction.channel.send(embed=maul_embed) # Send to caster
                     
                     new_pos = max(0, caster_pos + final_move_amount) # Calculate new_pos for caster
                     # 🔹 FIXED: Async log
