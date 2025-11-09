@@ -862,6 +862,35 @@ class DropSelectView(ui.View):
         self.add_item(DropSelect(submitting_user, submitted_for, screenshot_url, boss))
 
 
+# ---------------------------
+# 🔹 Teleblock Helper Functions
+# ---------------------------
+
+def get_teleblock_status(team_name):
+    """Checks if a team is teleblocked. Returns 'yes' or 'no'."""
+    try:
+        team_data_headers = team_data_sheet.row_values(1)
+        tb_col_index = team_data_headers.index("Teleblocked") + 1
+        team_cell = team_data_sheet.find(team_name)
+        if team_cell:
+            return team_data_sheet.cell(team_cell.row, tb_col_index).value or "no"
+        return "no"
+    except Exception as e:
+        print(f"Error getting teleblock status for {team_name}: {e}")
+        return "no"
+
+def set_teleblock_status(team_name, status="yes"):
+    """Sets a team's teleblock status. status should be 'yes' or 'no'."""
+    try:
+        team_data_headers = team_data_sheet.row_values(1)
+        tb_col_index = team_data_headers.index("Teleblocked") + 1
+        team_cell = team_data_sheet.find(team_name)
+        if team_cell:
+            team_data_sheet.update_cell(team_cell.row, tb_col_index, status)
+            print(f"Set teleblock status for {team_name} to {status}")
+    except Exception as e:
+        print(f"Error setting teleblock status for {team_name}: {e}")
+
 @bot.tree.command(name="roll", description="Roll a dice (1-6)")
 async def roll(interaction: discord.Interaction):
     # 🔹 FIXED: Compare as strings
@@ -2878,5 +2907,6 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
 
 
