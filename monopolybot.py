@@ -679,7 +679,7 @@ class DropReviewButtons(ui.View):
                             roll_grant_embed = discord.Embed(
                                 title="🎲 Roll Granted!",
                                 description=(
-                                    f"Your team landed a drop (**{self.boss}**) on a valid tile (**{current_tile}**).\n"
+                                    f"Your team landed a drop at **{self.boss}**!"
                                     "A free roll has been granted! Use `/roll` to use it."
                                 ),
                                 color=discord.Color.green()
@@ -1351,14 +1351,6 @@ async def buy_house(interaction: discord.Interaction):
         team_data_sheet.update_cell(team_row_index, team_gp_col_gspread, new_gp)
         
         set_bought_house_flag(team_name, "yes")
-        
-        # 🔹 FIXED: Do not log /buy_house.
-        # This was causing a double-buy/double-charge.
-        # log_command(
-        #     interaction.user.name,
-        #     "/buy_house",
-        #     {"team": team_name, "new_house_count": new_house_count, "cost": house_cost}
-        # )
         
         buy_message = (
             f"🏠 **{team_name}** purchased a house for **{house_cost:,.0f}** GP on tile {current_pos}!\n"
@@ -2907,6 +2899,3 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
-
-
-
