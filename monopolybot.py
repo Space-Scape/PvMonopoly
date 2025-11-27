@@ -21,8 +21,6 @@ from discord import ui, Interaction, SelectOption, TextStyle, Attachment, Member
 SPREADSHEET_ID = "1OVC8HImUpoh2keU-h2v_b2gFDa4zyfWsaJxBWRoSJ08"
 TEAM_ROLES = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5"]
 
-# 🔹 Channel and Role IDs
-# 🔹 FIXED: Define as strings for robust comparison
 DROP_SUBMISSION_CHANNEL_ID = os.getenv("DROP_SUBMISSION_CHANNEL_ID")
 REVIEW_CHANNEL_ID = "1436465463742824499"
 LOG_CHANNEL_ID = "1436463720401211474"
@@ -34,13 +32,12 @@ TEAM_CHANNELS_MAP = {
     "Team 4": 1436461078287749192,
     "Team 5": 1436461117156364439
 }
-# 🔹 FIXED: Create a list of strings for comparison
 TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
 
 EVENT_STAFF_ROLE_ID = 1286238788716199952
 EVENT_CAPTAIN_ROLE_ID = 1286238713210474559
 
-BOARD_SIZE = 40 # Assuming a 40-tile board
+BOARD_SIZE = 40
 
 # ========== CARD EMOJI MAPPING (NEW) ==========
 CARD_EMOJIS = {
@@ -65,8 +62,6 @@ CARD_EMOJIS = {
     "Chest": "📦",
     "Chance": "❓",
 }
-# ============================================
-
 # ========== DISCORD SETUP ==========
 intents = discord.Intents.default()
 intents.members = True
@@ -107,7 +102,6 @@ drop_log_sheet = sheet.worksheet("DropLog")
 item_values_sheet = sheet.worksheet("ItemValues")
 house_data_sheet = sheet.worksheet("HouseData")
 
-# For board logic
 GO_TILE = 0
 JAIL_TILE = 10
 BANK_STANDING_TILE = 20
@@ -116,7 +110,6 @@ CHEST_TILES = {2, 17, 33}
 CHANCE_TILES = {7, 22, 36}
 GLIDER_TILES = {12, 28, 38}
 
-# Tiles that grant a free roll if landed on with 0 rolls available
 ROLL_GRANTING_TILES = {GO_TILE, JAIL_TILE, BANK_STANDING_TILE} | GLIDER_TILES | CHEST_TILES | CHANCE_TILES
 
 # ---------------------------
@@ -203,7 +196,6 @@ def get_team_house_color(team_name: str) -> str:
                 return color_hex
     except Exception as e:
         print(f"❌ Error fetching color for {team_name}: {e}")
-    # Default fallback
     return "#FFFFFF"
 
 
@@ -219,7 +211,6 @@ def get_houses() -> list:
             tile = int(record.get("Tile", 0) or 0)
             owner = record.get("OwnerTeam", "")
             if tile > 0 and owner:
-                # Get team color from TeamData
                 color = get_team_house_color(owner)
                 houses.append({"tile": tile, "color": color})
         return houses
@@ -241,15 +232,15 @@ def place_house(team_name: str, tile_number: int, is_free: bool) -> bool:
             data = house_data_sheet.get_all_records()
             updated = False
 
-            for idx, row in enumerate(data, start=2):  # row 1 is headers
+            for idx, row in enumerate(data, start=2):
                 if int(row.get("Tile", 0)) == tile_number:
                     if row.get("OwnerTeam", "") == team_name:
                         count = int(row.get("HouseCount", 0)) + 1
                     else:
                         count = 1
 
-                    house_data_sheet.update_acell(f"C{idx}", team_name)  # OwnerTeam col
-                    house_data_sheet.update_acell(f"D{idx}", str(count))  # HouseCount col
+                    house_data_sheet.update_acell(f"C{idx}", team_name)
+                    house_data_sheet.update_acell(f"D{idx}", str(count))
                     updated = True
                     print(f"🏠 Updated existing house on tile {tile_number} for {team_name} (now {count} houses).")
                     break
@@ -406,7 +397,7 @@ class RejectModal(ui.Modal, title="Reject Drop Submission"):
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            log_chan = interaction.client.get_channel(int(LOG_CHANNEL_ID)) # 🔹 FIXED: Cast to int
+            log_chan = interaction.client.get_channel(int(LOG_CHANNEL_ID))
             if log_chan:
                 await log_chan.send(
                     f"❌ Drop submission rejected for {self.submitter.mention} by {interaction.user.mention}.\n"
@@ -516,7 +507,6 @@ class DropReviewButtons(ui.View):
             return
 
         try:
-            # 🔹 FIXED: Defer immediately to prevent 10062 timeout error
             await interaction.response.defer(ephemeral=True)
 
             embed = self.message.embeds[0]
@@ -537,7 +527,7 @@ class DropReviewButtons(ui.View):
             
             await self.message.delete()
 
-            log_chan = bot.get_channel(int(LOG_CHANNEL_ID)) # 🔹 FIXED: Cast to int
+            log_chan = bot.get_channel(int(LOG_CHANNEL_ID))
             team_chan = get_team_channel(get_team(self.submitted_user))
 
             if log_chan:
@@ -565,7 +555,7 @@ class DropReviewButtons(ui.View):
                 gp_lookup = {item['Item']: int(str(item['GP']).replace(',', '')) for item in item_values_records}
                 
                 base_gp_value = gp_lookup.get(self.drop, 0)
-                final_gp_value = base_gp_value * gp_multiplier  # Apply multiplier
+                final_gp_value = base_gp_value * gp_multiplier
 
                 if gp_multiplier > 1 and consumed_card_name:
                     emoji = CARD_EMOJIS.get(consumed_card_name, "")
@@ -597,7 +587,7 @@ class DropReviewButtons(ui.View):
                             tax_map = {1: 0.05, 2: 0.10, 3: 0.20, 4: 0.40}
                             tax_percent = tax_map.get(house_count, 0)
                             tax_amount = int(final_gp_value * tax_percent)
-                            final_gp_value -= tax_amount  # Deduct tax before awarding
+                            final_gp_value -= tax_amount
 
                     headers = team_data_sheet.row_values(1)
                     try:
@@ -636,18 +626,14 @@ class DropReviewButtons(ui.View):
                             f"to **{owner_team}** for a level {house_count} house on tile {current_tile} "
                             f"({int((tax_amount / (tax_amount + final_gp_value)) * 100)}% of the reward)."
                         )
-                        if team_chan: # Submitter's channel
+                        if team_chan:
                             await team_chan.send(tax_message)
-                        if owner_team_chan: # Owner's channel
+                        if owner_team_chan:
                             await owner_team_chan.send(tax_message)
 
             except Exception as e:
                 print(f"❌ Error in GP/tax logic: {e}")
             
-            # ==========================================================
-            # 🔹 Team Data Sheet Records  
-            # ==========================================================
-
             if team_name and team_name != "*No team*":
                 try:
                     records = team_data_sheet.get_all_records()
@@ -674,7 +660,6 @@ class DropReviewButtons(ui.View):
                         increment_rolls_available(team_name)
                         print(f"✅ Roll granted: Team {team_name} on tile {current_tile} ({self.boss})")
                         
-                        # 🔹 NEW: Notify the team they received a roll
                         if team_chan:
                             roll_grant_embed = discord.Embed(
                                 title="🎲 Roll Granted!",
@@ -690,12 +675,10 @@ class DropReviewButtons(ui.View):
                 except Exception as e:
                     print(f"❌ Error checking tile before granting roll: {e}")
 
-            # 🔹 FIXED: Use followup.send instead of response.send_message
             await interaction.followup.send("✅ Drop approved and logged.", ephemeral=True)
 
         except Exception as e:
             print(f"❌ Error in approve_button: {e}")
-            # 🔹 FIXED: Use followup.send instead of response.send_message
             await interaction.followup.send(f"Error approving drop: {e}", ephemeral=True)
 
     @ui.button(label="Reject Drop", style=discord.ButtonStyle.danger, custom_id="reject_drop")
@@ -705,7 +688,6 @@ class DropReviewButtons(ui.View):
             return
         await interaction.response.send_modal(RejectModal(self.message, self.submitted_user))
 
-# ======= BossSelect Modal + View =======
 class BossSelectView(ui.View):
     def __init__(self, submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str):
         super().__init__(timeout=180)
@@ -771,7 +753,6 @@ class BossSelectView(ui.View):
             ),
         )
 
-
 class DropSelect(ui.Select):
     def __init__(self, submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str, boss: str):
         self.submitting_user = submitting_user
@@ -828,7 +809,7 @@ class DropSelect(ui.Select):
         embed.add_field(name="Submitted By", value=f"{self.submitting_user.mention} `({self.submitting_user.id})`", inline=False)
         embed.set_image(url=self.screenshot_url)
 
-        review_channel = bot.get_channel(int(REVIEW_CHANNEL_ID)) # 🔹 FIXED: Cast to int
+        review_channel = bot.get_channel(int(REVIEW_CHANNEL_ID))
         if not review_channel:
             print(f"❌ Review channel {REVIEW_CHANNEL_ID} not found")
             await interaction.response.edit_message(content="❌ Review channel not found.", view=None, embed=None)
@@ -862,10 +843,6 @@ class DropSelectView(ui.View):
         self.add_item(DropSelect(submitting_user, submitted_for, screenshot_url, boss))
 
 
-# ---------------------------
-# 🔹 Teleblock Helper Functions
-# ---------------------------
-
 def get_teleblock_status(team_name):
     """Checks if a team is teleblocked. Returns 'yes' or 'no'."""
     try:
@@ -893,7 +870,6 @@ def set_teleblock_status(team_name, status="yes"):
 
 @bot.tree.command(name="roll", description="Roll a dice (1-6)")
 async def roll(interaction: discord.Interaction):
-    # 🔹 FIXED: Compare as strings
     if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
@@ -912,13 +888,10 @@ async def roll(interaction: discord.Interaction):
         await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
         return
         
-    # ---------------------------
-    # 🔹 NEW: Clear Teleblock Status
-    # ---------------------------
     set_teleblock_status(team_name, "no")
     
     team_chan = get_team_channel(team_name)
-    log_chan = bot.get_channel(int(LOG_CHANNEL_ID)) # 🔹 FIXED: Cast to int
+    log_chan = bot.get_channel(int(LOG_CHANNEL_ID))
 
     try:
         cleared_cards = clear_all_active_statuses(team_name)
@@ -929,7 +902,6 @@ async def roll(interaction: discord.Interaction):
     except Exception as e:
         print(f"❌ Error clearing active statuses: {e}")
 
-    # Fetch initial data and determine row/indices
     records = team_data_sheet.get_all_records()
     team_data_values = team_data_sheet.get_all_values()
     headers = team_data_values[0]
@@ -985,13 +957,11 @@ async def roll(interaction: discord.Interaction):
     
     if raw_pos >= BOARD_SIZE and new_pos != 30: 
         try:
-            # Update Pass Count
             current_pass_count_str = team_data_sheet.cell(team_row_index, pass_go_col_index).value
             current_pass_count = int(current_pass_count_str) if current_pass_count_str and str(current_pass_count_str).replace(',', '').isdigit() else 0
             new_pass_count = current_pass_count + 1
             team_data_sheet.update_cell(team_row_index, pass_go_col_index, new_pass_count)
             
-            # Award GP
             pass_go_bonus = 20_000_000
             current_gp_str = team_data_sheet.cell(team_row_index, gp_col_index).value
             current_gp = int(current_gp_str) if current_gp_str and str(current_gp_str).replace(',', '').isdigit() else 0
@@ -1002,7 +972,6 @@ async def roll(interaction: discord.Interaction):
         except Exception as e:
             print(f"❌ Error updating sheet for Pass Go: {e}")
 
-    # 2. Apply special tile movement logic (teleports) to the calculated new_pos
     if new_pos == 12:
         new_pos = 28 if current_tile != 38 else 12
     elif new_pos == 28:
@@ -1013,13 +982,11 @@ async def roll(interaction: discord.Interaction):
         new_pos = JAIL_TILE # Go to Jail
         go_message = "🚨 **GO TO JAIL!** You land on tile 30 and are immediately sent to tile 10."
 
-    # 3. Update position in sheet with the final calculated position
     try:
         team_data_sheet.update_cell(team_row_index, pos_col_index, new_pos)
     except Exception as e:
         print(f"❌ Error updating Position in sheet: {e}")
 
-    # 4. Send roll embed and Go message
     roll_embed = discord.Embed(
         title=f"🎲 {team_name} Rolled!",
         description=f"**{interaction.user.display_name}** rolled a **{result}**! Moving to tile **{new_pos}**.",
@@ -1030,27 +997,23 @@ async def roll(interaction: discord.Interaction):
     if go_message:
         await interaction.channel.send(go_message)
         
-    # 5. Handle Post-Move Landings (Card Draw and Free Roll if needed)
     if not team_chan:
         print(f"❌ Log channel {LOG_CHANNEL_ID} not found, can't send card embeds.")
         return
 
-    # This function now handles both card draws AND free roll grants
     await check_and_award_card_on_land(team_name, new_pos, "landing on")
 
 @bot.tree.command(name="customize", description="Open the customization panel for your team")
 async def customize(interaction: discord.Interaction):
-    # 🔹 FIXED: Compare as strings
     if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
         )
         return
 
-    await interaction.response.defer(ephemeral=True) # Defer the response
+    await interaction.response.defer(ephemeral=True)
     team_name = get_team(interaction.user) or "*No team*"
     
-    # 🔹 FIXED: Run blocking sheet I/O in an executor
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
         None,
@@ -1066,7 +1029,6 @@ async def customize(interaction: discord.Interaction):
 
 @bot.tree.command(name="gp", description="Check your team's current GP balance.")
 async def gp(interaction: discord.Interaction):
-    # 🔹 FIXED: Compare as strings
     if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
@@ -1088,7 +1050,7 @@ async def gp(interaction: discord.Interaction):
         for record in records:
             if record.get("Team") == team_name:
                 team_gp = int(record.get("GP", 0) or 0)
-                team_passes = int(record.get("Go Passes", 0) or 0) # 🔹 UPDATED: Use "Go Passes"
+                team_passes = int(record.get("Go Passes", 0) or 0)
                 found_team = True
                 break
         
@@ -1106,7 +1068,7 @@ async def gp(interaction: discord.Interaction):
             inline=False
         )
         embed.add_field(
-            name="Go Passes", # 🔹 UPDATED: Use "Go Passes"
+            name="Go Passes",
             value=f"**{team_passes}** passes",
             inline=False
         )
@@ -1118,7 +1080,6 @@ async def gp(interaction: discord.Interaction):
 
 @bot.tree.command(name="stats", description="Show GP and Go Passes for all teams.")
 async def stats(interaction: discord.Interaction):
-    # 🔹 NEW: Public /stats command
     await interaction.response.defer(ephemeral=False)
     
     try:
@@ -1134,22 +1095,18 @@ async def stats(interaction: discord.Interaction):
         for record in records:
             team_name = record.get("Team", "Unknown Team")
             
-            # GP
             team_gp_str = str(record.get("GP", 0)).replace(',', '').strip()
             team_gp = int(team_gp_str) if team_gp_str and team_gp_str.isdigit() else 0
             
-            # Passes Go Count
             team_passes_str = str(record.get("Go Passes", 0)).replace(',', '').strip() # 🔹 UPDATED: Use "Go Passes"
             team_passes = int(team_passes_str) if team_passes_str and team_passes_str.isdigit() else 0
             
             gp_list.append({"team": team_name, "value": team_gp})
             go_passes_list.append({"team": team_name, "value": team_passes})
             
-        # Sort lists
         gp_list.sort(key=lambda x: x["value"], reverse=True)
         go_passes_list.sort(key=lambda x: x["value"], reverse=True)
 
-        # Format output
         gp_output = ""
         for i, entry in enumerate(gp_list, 1):
             gp_output += f"**{i}. {entry['team']}**: {entry['value']:,} GP\n"
@@ -1168,7 +1125,7 @@ async def stats(interaction: discord.Interaction):
             embed.add_field(name="<:MaxCash:1347684049040183427> GP Holdings", value=gp_output, inline=False)
             
         if passes_output:
-            embed.add_field(name="🚶 Go Passes", value=passes_output, inline=False) # 🔹 UPDATED: Use "Go Passes"
+            embed.add_field(name="🚶 Go Passes", value=passes_output, inline=False)
             
         await interaction.followup.send(embed=embed)
 
@@ -1180,7 +1137,6 @@ async def stats(interaction: discord.Interaction):
 
 @bot.tree.command(name="buy_house", description="Attempt to buy a house on your current tile.")
 async def buy_house(interaction: discord.Interaction):
-    # 🔹 FIXED: Compare as strings
     if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
@@ -1357,14 +1313,14 @@ async def buy_house(interaction: discord.Interaction):
             f"This property now has **{new_house_count}** house(s).\n"
             f"Your team's new balance is **{new_gp:,.0f}** GP."
         )
-        await interaction.followup.send(buy_message, ephemeral=False) # Team channel
+        await interaction.followup.send(buy_message, ephemeral=False)
         
     except gspread.exceptions.APIError as e:
         print(f"❌ Google Sheets API error in /buy_house: {e}")
         await interaction.followup.send("❌ A database error occurred. Please try again.", ephemeral=True)
     except Exception as e:
         print(f"❌ General error in /buy_house: {e}")
-        traceback.print_exc() # Print full error for debugging
+        traceback.print_exc()
         await interaction.followup.send("❌ An unexpected error occurred.", ephemeral=True)
 
 @bot.tree.command(name="submitdrop", description="Submit a boss drop for review")
@@ -1405,11 +1361,10 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
             eligible_cards = []
             for i, row in enumerate(rows, start=2):
                 held_by = str(row.get("Held By Team", ""))
-                if held_by == "": # Find a card no one holds
+                if held_by == "":
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                # 🔹 FIXED: IndentationError
                 await team_channel.send(f"❗ **{team_name}** tried to draw a Chance card, but none were available!")
                 return
                 
@@ -1435,9 +1390,9 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                 print(f"✅ Stored wildcard {wildcard_data} for {team_name} in {card_type} sheet")
 
 
-            card_sheet.update_cell(card_row_index, 3, team_name) # Update Col C
+            card_sheet.update_cell(card_row_index, 3, team_name)
         
-        else: # Chest card logic
+        else:
             eligible_cards = []
             for i, row in enumerate(rows, start=2):
                 held_by = str(row.get("Held By Team", ""))
@@ -1445,7 +1400,6 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
                     eligible_cards.append({"index": i, "data": row})
             
             if not eligible_cards:
-                # 🔹 FIXED: IndentationError (Just in case, though this logic seems different)
                 await team_channel.send(f"❗ **{team_name}** tried to draw a {card_type} card, but none were available!")
                 return
 
@@ -1489,7 +1443,6 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
 
             held_by_str = str(card_sheet.cell(card_row_index, 3).value or "")
             
-            # 🔹 BUGFIX: Correctly append team to a list of teams
             teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
             if team_name not in teams:
                 teams.append(team_name)
@@ -1502,7 +1455,6 @@ async def team_receives_card(team_name: str, card_type: str, team_channel: disco
             card_text_display = card_text_display.replace("%d6", str(new_roll))
             card_text_display = card_text_display.replace("%d3", str(new_roll))
         
-        # 🔹 FIXED: Get specific emoji for the card
         card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type))
 
         embed = discord.Embed(
@@ -1604,7 +1556,7 @@ def check_and_consume_vengeance(target_team_name: str) -> bool:
         team_status = vengeance_wildcard_data.get(target_team_name)
         if team_status and isinstance(team_status, str) and team_status.strip() == "active":
             del vengeance_wildcard_data[target_team_name]
-            chance_sheet.update_cell(vengeance_row_index, wildcard_col + 1, json.dumps(vengeance_wildcard_data)) # +1 for 1-based index
+            chance_sheet.update_cell(vengeance_row_index, wildcard_col + 1, json.dumps(vengeance_wildcard_data))
             
             held_by_str = str(chance_sheet.cell(vengeance_row_index, held_by_col + 1).value or "")
             teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
@@ -1656,7 +1608,7 @@ def check_and_consume_redemption(target_team_name: str) -> bool:
         team_status = redemption_wildcard_data.get(target_team_name)
         if team_status and isinstance(team_status, str) and team_status.strip() == "active":
             del redemption_wildcard_data[target_team_name]
-            chance_sheet.update_cell(redemption_row_index, wildcard_col + 1, json.dumps(redemption_wildcard_data)) # +1 for 1-based index
+            chance_sheet.update_cell(redemption_row_index, wildcard_col + 1, json.dumps(redemption_wildcard_data))
             
             held_by_str = str(chance_sheet.cell(redemption_row_index, held_by_col + 1).value or "")
             teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
@@ -1704,12 +1656,12 @@ def check_and_consume_elder_maul(target_team_name: str) -> bool:
         
         if card_row_index == -1:
             print("❗ Elder Maul card not found on chance sheet.")
-            return False # Card not found
+            return False
 
         team_status = card_wildcard_data.get(target_team_name)
         if team_status and isinstance(team_status, str) and team_status.strip() == "active":
             del card_wildcard_data[target_team_name]
-            chance_sheet.update_cell(card_row_index, wildcard_col + 1, json.dumps(card_wildcard_data)) # +1 for 1-based index
+            chance_sheet.update_cell(card_row_index, wildcard_col + 1, json.dumps(card_wildcard_data))
             
             held_by_str = str(chance_sheet.cell(card_row_index, held_by_col + 1).value or "")
             teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
@@ -1767,7 +1719,7 @@ def check_and_consume_alchemy(team_name: str) -> (int, str):
                 multiplier = 3 if card_name == "High Alchemy" else 2
                 
                 del wildcard_data[found_key]
-                chance_sheet.update_cell(i, wildcard_col + 1, json.dumps(wildcard_data)) # +1 for 1-based index
+                chance_sheet.update_cell(i, wildcard_col + 1, json.dumps(wildcard_data))
                 
                 held_by_str = str(chance_sheet.cell(i, held_by_col + 1).value or "")
                 teams = [t.strip() for t in held_by_str.split(',') if t.strip()]
@@ -1781,7 +1733,7 @@ def check_and_consume_alchemy(team_name: str) -> (int, str):
     except Exception as e:
         print(f"❌ Error in check_and_consume_alchemy: {e}")
         
-    return 1, None # Default multiplier
+    return 1, None
 
 def clear_all_active_statuses(team_name: str):
     """
@@ -1810,7 +1762,6 @@ def clear_all_active_statuses(team_name: str):
                 if len(row) <= max(name_col, held_by_col, wildcard_col):
                     continue
                 
-                # 🔹 FIXED: Skip Alchemy cards
                 card_name = row[name_col]
                 if card_name in ("Low Alchemy", "High Alchemy"):
                     continue
@@ -1869,7 +1820,6 @@ async def check_and_award_card_on_land(team_name: str, new_pos: int, reason: str
         print(f"❌ Cannot award card on land: Team channel for {team_name} not found.")
         return
 
-    # 1. Check for Free Roll Grant
     if new_pos in ROLL_GRANTING_TILES:
         try:
             rolls_available = get_team_rolls(team_name)
@@ -1894,7 +1844,6 @@ async def check_and_award_card_on_land(team_name: str, new_pos: int, reason: str
         except Exception as e:
             print(f"❌ Error during roll protection check for {team_name}: {e}")
 
-    # 2. Check for Card Draw
     if new_pos in CHEST_TILES:
         print(f"❗ {team_name} is {reason} CHEST tile {new_pos}")
         await team_receives_card(team_name, "Chest", team_channel)
@@ -1906,7 +1855,6 @@ async def check_and_award_card_on_land(team_name: str, new_pos: int, reason: str
 
 @bot.tree.command(name="show_cards", description="Show all cards currently held by your team.")
 async def show_cards(interaction: discord.Interaction):
-    # 🔹 FIXED: Compare as strings
     if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
@@ -1957,7 +1905,6 @@ async def show_cards(interaction: discord.Interaction):
 @bot.tree.command(name="use_card", description="Use a held card by its index from /show_cards")
 @app_commands.describe(index="The index of the card you want to use (starts at 1)")
 async def use_card(interaction: discord.Interaction, index: int):
-    # 🔹 FIXED: Compare as strings
     if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
         await interaction.response.send_message(
             "❌ You can only use this command in your team's channel.", ephemeral=True
@@ -2005,19 +1952,19 @@ async def use_card(interaction: discord.Interaction, index: int):
         await interaction.followup.send(f"❌ Invalid card index. Use `/show_cards` and pick a number between 1 and {len(all_cards)}.", ephemeral=True)
         return
     
-    selected_card = all_cards[index - 1] # Convert 1-based index to 0-based
+    selected_card = all_cards[index - 1]
     card_type = "Chest" if (index - 1) < len(chest_cards) else "Chance"
     card_sheet = chest_sheet if card_type == "Chest" else chance_sheet
     card_row = selected_card['row_index']
     
     card_name = selected_card['name']
-    card_emoji = CARD_EMOJIS.get(card_name, "✅") # Default to checkmark if not found
+    card_emoji = CARD_EMOJIS.get(card_name, "✅")
     
     stored_roll = None
     final_card_text = selected_card['text']
     
     is_status_activation = False
-    embed_description = "" # Initialize embed description
+    embed_description = ""
     
     loop = asyncio.get_event_loop()
 
@@ -2042,7 +1989,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True # Mark as activation
+            is_status_activation = True
             
             embed_description = f"**{team_name}** used **Vengeance**!\n\n> The next card effect used on them will be rebounded."
 
@@ -2053,7 +2000,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True # Mark as activation
+            is_status_activation = True
             
             embed_description = f"**{team_name}** used **Redemption**!\n\n> The next negative card effect used on your team will be fizzled."
 
@@ -2064,7 +2011,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True # Mark as activation
+            is_status_activation = True
             
             embed_description = f"**{team_name}** used **Elder Maul**!\n\n> The next negative card effect used on your team will be reduced."
 
@@ -2075,7 +2022,7 @@ async def use_card(interaction: discord.Interaction, index: int):
 
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True # Mark as activation
+            is_status_activation = True
             
             embed_description = f"**{team_name}** used **Low Alchemy**!\n\n> Your next drop this turn will be worth **double GP**."
             
@@ -2086,7 +2033,7 @@ async def use_card(interaction: discord.Interaction, index: int):
                 
             wildcard_data[team_name] = "active"
             card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data))
-            is_status_activation = True # Mark as activation
+            is_status_activation = True
             
             embed_description = f"**{team_name}** used **High Alchemy**!\n\n> Your next drop this turn will be worth **triple GP**."
             
@@ -2104,7 +2051,7 @@ async def use_card(interaction: discord.Interaction, index: int):
             
             if caster_pos == -1:
                 await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
-                return # Stop, card is not consumed
+                return
 
             if rolls_available == 0:
                 increment_rolls_available(team_name)
@@ -2899,3 +2846,4 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 bot.run(os.getenv('bot_token'))
+
