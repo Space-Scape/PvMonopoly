@@ -134,7 +134,7 @@ boss_drops = {
     "Royal Titans": ["Fire element staff crown", "Mystic vigour prayer scroll", "Bran", "Ice element staff crown", "Deadeye prayer scroll"],
     "Sarachnis": ["Sarachnis cudgel", "Sraracha", "Pristine spider silk"],
     "Scorpia": ["Scorpia's offspring", "Odium shard 3", "Malediction shard 3", "Dragon 2h sword"],
-    "Tempoross": ["Tiny tempor", "Big harpoonfish", "Tome of water (empty)", "Tackle box", "Fish barrel", "Dragon harpoon"]
+    "Tempoross": ["Tiny tempor", "Big harpoonfish", "Tome of water (empty)", "Tackle box", "Fish barrel", "Dragon harpoon"],
     "The Leviathan": ["Lil'viathan", "Virtus mask", "Virtus robe top", "Virtus robe bottom", "Chromium ingot", "Venator vestige", "Leviathan's lure", "Smoke quartz"],
     "The Whisperer": ["Wisp", "Virtus mask", "Virtus robe top", "Virtus robe bottom", "Chromium ingot", "Bellator vestige", "Siren's staff", "Shadow quartz"],
     "Theatre of Blood": ["Lil' zik", "Avernic defender hilt", "Ghrazi rapier", "Sanguinesti staff (uncharged)", "Justiciar faceguard", "Justiciar chestguard", "Justiciar legguards", "Scythe of vitur (uncharged)", "Holy ornament kit", "Sanguine ornament kit", "Sanguine dust"],
