@@ -23,9 +23,9 @@ SPREADSHEET_ID = "1OVC8HImUpoh2keU-h2v_b2gFDa4zyfWsaJxBWRoSJ08"
 SIGNUP_SPREADSHEET_ID = "1c7TzXlyn8KinCKNJadIBfY_6PcXF-9icbfC_E8NAGqI"
 TEAM_ROLES = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7"]
 
-REVIEW_CHANNEL = "1436465463742824499"
-LOG_CHANNEL = "1436463720401211474"
-GAME_LOG_CHANNEL_ID = 1477197002499690516
+REVIEW_CHANNEL = "1529770992904179722"
+LOG_CHANNEL = "1529771012202303488"
+GAME_LOG_CHANNEL_ID = 1529771046293602314
 GAME_LOG_TEAM_COLOR_MAP = {
     "Team 1": 0x00BCD4,  # Cyan
     "Team 2": 0x9B59B6,  # Purple
@@ -38,25 +38,25 @@ GAME_LOG_TEAM_COLOR_MAP = {
 
 
 TEAM_CHANNELS_MAP = {
-    "Team 1": 1436460767145754845,
-    "Team 2": 1437851582183248113,
-    "Team 3": 1437850674233872384,
-    "Team 4": 1437851273113112707,
-    "Team 5": 1437851747035910295,
-    "Team 6": 1476784856028414074,
-    "Team 7": 1476784946315002000
+    "Team 1": 1530028184873996490,
+    "Team 2": 1530028187822723244,
+    "Team 3": 1530028190221860995,
+    "Team 4": 1530028202355855481#,
+    #"Team 5": 1437851747035910295,
+    #"Team 6": 1476784856028414074,
+    #"Team 7": 1476784946315002000
 }
 TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
 
-TEAM_REQUEST_CHANNEL_ID = 1477919745176109220
+TEAM_REQUEST_CHANNEL_ID = 1530026639860432956
 ACTIVE_TEAMS = ["Team 1", "Team 2", "Team 3"]
 TEAM_LIST_CONFIG_FILE = "team_list_config.json"
 
 SIGNUP_LIST_CONFIG_FILE = "signup_list_config.json"
 
-EVENT_STAFF_ROLE_ID = 1286238788716199952
-EVENT_CAPTAIN_ROLE_ID = 1286238713210474559
-BINGO_PLAYER_ROLE_ID = 1464304452059267208
+EVENT_STAFF_ROLE_ID = 1517751612951756800
+EVENT_CAPTAIN_ROLE_ID = 1530027474577133801
+BINGO_PLAYER_ROLE_ID = 1530027491459076207
 
 BOARD_SIZE = 40
 
@@ -120,7 +120,7 @@ boss_drops = {
     "Duke Sucellus": ["Baron", "Virtus mask", "Virtus robe top", "Virtus robe bottom", "Chromium ingot", "Magus vestige", "Eye of the duke", "Ice quartz"],
     "Gauntlet": ["Youngllef", "Crystal weapon seed", "Crystal armour seed", "Enhanced crystal weapon seed"],
     "General Graardor": ["Pet general graardor", "Bandos hilt", "Bandos chestplate", "Bandos tassets", "Bandos boots"],
-    "Grotesque Guardians": ["Noon", "Black tourmaline core", "Granite gloves", "Granite ring", "Granite hammer", "Jar of stone"]
+    "Grotesque Guardians": ["Noon", "Black tourmaline core", "Granite gloves", "Granite ring", "Granite hammer", "Jar of stone"],
     "Hueycoatl": ["Huberte", "Dragon hunter wand", "Hueycoatl hide", "Tome of earth (empty)"],
     "Kalphite Queen": ["Kalphite princess", "Kq head", "Jar of sand", "Dragon 2h sword", "Dragon chainbody", "Dragon pickaxe"],
     "King Black Dragon": ["Prince black dragon", "Kbd heads", "Dragon pickaxe", "Draconic visage"],
