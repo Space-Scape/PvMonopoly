@@ -27,13 +27,13 @@ REVIEW_CHANNEL = "1529770992904179722"
 LOG_CHANNEL = "1529771012202303488"
 GAME_LOG_CHANNEL_ID = 1529771046293602314
 GAME_LOG_TEAM_COLOR_MAP = {
-    "Team 1": 0x00BCD4,  # Cyan
-    "Team 2": 0x9B59B6,  # Purple
-    "Team 3": 0xE74C3C,  # Red
-    "Team 4": 0x2ECC71,  # Green
-    "Team 5": 0x00BCD4,  # Red
-    "Team 6": 0xC4A484,  # Light Brown
-    "Team 7": 0x3498DB,  # Blue
+    "Team 1": 0x00BCD4,
+    "Team 2": 0x9B59B6,
+    "Team 3": 0xE74C3C,
+    "Team 4": 0x2ECC71,
+    "Team 5": 0x00BCD4,
+    "Team 6": 0xC4A484,
+    "Team 7": 0x3498DB,
 }
 
 
@@ -41,10 +41,10 @@ TEAM_CHANNELS_MAP = {
     "Team 1": 1530028184873996490,
     "Team 2": 1530028187822723244,
     "Team 3": 1530028190221860995,
-    "Team 4": 1530028202355855481#,
-    #"Team 5": 1437851747035910295,
-    #"Team 6": 1476784856028414074,
-    #"Team 7": 1476784946315002000
+    "Team 4": 1530028202355855481,
+    "Team 5": 1437851747035910295,
+    "Team 6": 1476784856028414074,
+    "Team 7": 1476784946315002000
 }
 TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
 
@@ -227,8 +227,7 @@ class MonopolyCog(commands.Cog):
             
             print("✅ Monopoly Cog: Google Sheets initialized.")
 
-            # Signup spreadsheet is optional for Monopoly gameplay; load separately so failures here
-            # don't stop the event bot from running.
+            # Signup spreadsheet is optional
             try:
                 self.signup_sheet_book = sheet_client.open_by_key(SIGNUP_SPREADSHEET_ID)
                 try:
@@ -358,7 +357,6 @@ class MonopolyCog(commands.Cog):
                 return description
             team_name = team_name or "Unknown Team"
             desc = str(description).strip()
-            # Prefer the first sentence/line for the public log to avoid duplicating victim-only detail.
             first_line = desc.split('\n', 1)[0].strip()
             first_sentence = first_line.split('. ', 1)[0].strip()
             candidate = (first_sentence + ('.' if first_sentence and not first_sentence.endswith('.') else '')) if first_sentence else first_line
@@ -375,7 +373,6 @@ class MonopolyCog(commands.Cog):
             for old, new in replacements:
                 candidate = candidate.replace(old, new)
 
-            # Light cleanup if the source used markdown around team names.
             candidate = candidate.replace('**', '')
             return candidate or desc
         except Exception as e:
@@ -398,7 +395,6 @@ class MonopolyCog(commands.Cog):
                     parts.append(str(getattr(field, 'value', '')))
             text_blob = ' '.join(parts).lower()
 
-            # Keep hidden: drawing/receiving cards
             secret_card_phrases = [
                 'drew a chance card', 'drew a chest card',
                 'received a chance card', 'received a chest card',
@@ -407,7 +403,6 @@ class MonopolyCog(commands.Cog):
             if any(phrase in text_blob for phrase in secret_card_phrases):
                 return True
 
-            # Keep hidden: activation card usage / activation trigger messages
             secret_activation_phrases = [
                 'vengeance activated',
                 'redemption activated',
@@ -455,12 +450,9 @@ class MonopolyCog(commands.Cog):
                 original_title = str(log_embed.title).strip() if log_embed.title else ""
                 original_description = str(log_embed.description).strip() if log_embed.description else ""
 
-                # Team-specific styling for easy scanning in the shared log.
                 log_embed.color = team_color
                 log_embed.title = log_title
 
-                # Victim-facing embeds read awkwardly in a shared log ("you/your team").
-                # Convert to a neutral summary and avoid extra fields/noise.
                 lower_title = original_title.lower()
                 lower_desc = original_description.lower()
                 looks_victim_facing = (
@@ -477,7 +469,6 @@ class MonopolyCog(commands.Cog):
                 if content:
                     extra = str(content).strip()
                     if extra:
-                        # Append plain message text to the description instead of extra fields for cleaner logs.
                         if log_embed.description:
                             log_embed.description = f"{log_embed.description}\n{extra}"[:4096]
                         else:
@@ -557,7 +548,6 @@ class MonopolyCog(commands.Cog):
                     self.house_data_sheet.append_row([tile_number, "", team_name, 1])
                     print(f"<:housetele:1437980013831131206> Added new free house for {team_name} on tile {tile_number}.")
 
-                # ---> NEW: Sync the Houses Owned column <---
                 self.sync_houses_owned(team_name)
 
                 return True
@@ -639,26 +629,21 @@ class MonopolyCog(commands.Cog):
     async def process_manual_pass_go(self, team_name: str, team_row_idx: int, team_record: dict) -> str:
         """Helper to process GP and Passes when a card effect forces a player over GO."""
         try:
-            # Fetch fresh headers to ensure correct column indexing
             all_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             headers = list(all_records[0].keys())
             
             pass_go_col = headers.index("Go Passes") + 1
             gp_col = headers.index("GP") + 1
             
-            # Use data from the record provided
             cur_passes = int(team_record.get("Go Passes", 0))
             cur_gp = int(str(team_record.get("GP", 0)).replace(',',''))
             
-            # --- ADDED: Ents GP Halved Check ---
             is_gp_halved = str(team_record.get("GP Halved", "no")).strip().lower() == "yes"
             go_reward = 10_000_000 if is_gp_halved else 20_000_000
 
-            # Update the sheet
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, pass_go_col, cur_passes + 1)
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, cur_gp + go_reward)
             
-            # ---> ADDED THIS BLOCK: Deal 3 random cards for passing GO! <---
             team_chan = self.get_team_channel(team_name)
             if team_chan:
                 for _ in range(3):
@@ -666,7 +651,6 @@ class MonopolyCog(commands.Cog):
                     await self.team_receives_card(team_name, card_type, team_chan)
             
             if is_gp_halved:
-                # Clear the flag after the penalty is applied
                 asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "GP Halved"))
                 return f"\n\n💰 **PASS GO!** You crossed GO and received **10,000,000 GP** (Halved by 🌳 **The Ents**!) and **3 Random Cards**!"
             
@@ -938,7 +922,6 @@ class MonopolyCog(commands.Cog):
                     await log_chan.send(content=f"{mention} Drop submission approved by {interaction.user.mention}.", embed=embed)
                     print(f"✅ Sent approval to DropLog ({log_chan.name})")
 
-                # ---> THREADED LOGGING <---
                 await asyncio.to_thread(
                     self.cog.log_drop_to_sheet,
                     submitted_for=str(self.submitted_user),
@@ -949,16 +932,12 @@ class MonopolyCog(commands.Cog):
                     screenshot=self.image_url
                 )
 
-                # --- SCAVENGER MUTUALLY EXCLUSIVE REWARD LOGIC ---
                 is_scavenger = self.boss in SCAVENGER_BOSSES
                 scavenger_reward = None
                 
                 if is_scavenger:
-                    # 90% chance for GP, 5% for Chest, 5% for Chance
                     scavenger_reward = random.choices(["GP", "Chest", "Chance"], weights=[90, 5, 5], k=1)[0]
 
-                # --- GP CALCULATION LOGIC ---
-                # Only run GP calculation if it's a Main Board boss, OR if they won the GP roll as a Scavenger
                 if not is_scavenger or scavenger_reward == "GP":
                     try:
                         gp_multiplier, consumed_card_name = await asyncio.to_thread(self.cog.check_and_consume_alchemy, team_name)
@@ -969,7 +948,6 @@ class MonopolyCog(commands.Cog):
                         base_gp_value = gp_lookup.get(self.drop, 0)
                         final_gp_value = base_gp_value * gp_multiplier
 
-                        # ---> NERF SCAVENGER GP BY 50% <---
                         if is_scavenger:
                             final_gp_value = final_gp_value // 2
                         
@@ -1119,7 +1097,6 @@ class MonopolyCog(commands.Cog):
                     if is_scavenger and current_tile is not None and target_record is not None:
                         headers = list(target_record.keys())
                         
-                        # Map the boss names to your new column headers
                         boss_col_map = {
                             "Vorkath": "Scavenged Vorkath",
                             "Dagannoth Kings": "Scavenged DKS",
@@ -1127,24 +1104,20 @@ class MonopolyCog(commands.Cog):
                             "Royal Titans": "Scavenged Titans"
                         }
                         
-                        # Make sure the columns exist in the sheet
                         missing_cols = [col for col in boss_col_map.values() if col not in headers]
                         if missing_cols:
                             print(f"⚠️ Missing columns in Sheet: {missing_cols}")
                         else:
-                            # Get the column index for all 4 bosses
                             vork_idx = headers.index("Scavenged Vorkath") + 1
                             dks_idx = headers.index("Scavenged DKS") + 1
                             sara_idx = headers.index("Scavenged Sarachnis") + 1
                             titan_idx = headers.index("Scavenged Titans") + 1
                             
-                            # Read their current completion status
                             vork_done = str(target_record.get("Scavenged Vorkath", "")).strip().lower() in ["yes", "true", "1"]
                             dks_done = str(target_record.get("Scavenged DKS", "")).strip().lower() in ["yes", "true", "1"]
                             sara_done = str(target_record.get("Scavenged Sarachnis", "")).strip().lower() in ["yes", "true", "1"]
                             titan_done = str(target_record.get("Scavenged Titans", "")).strip().lower() in ["yes", "true", "1"]
                             
-                            # Mark the boss that was just approved as "done" in our local variables
                             target_col_name = boss_col_map.get(self.boss)
                             target_col_idx = headers.index(target_col_name) + 1
                             
@@ -1158,41 +1131,35 @@ class MonopolyCog(commands.Cog):
                             if has_all_4:
                                 await asyncio.to_thread(self.cog.increment_rolls_available, team_name)
                                 
-                                # Wipe all 4 cells clean for the next tile
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, vork_idx, "")
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, dks_idx, "")
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, sara_idx, "")
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, titan_idx, "")
                                 
-                                # --- EXECUTE THE SKIP TAX ---
                                 tax_msg = ""
                                 house_records = await asyncio.to_thread(self.cog.house_data_sheet.get_all_records)
                                 
                                 house_on_current = None
                                 any_other_house = None
                                 
-                                # Search for houses owned by the team
                                 for h_idx, h_rec in enumerate(house_records, start=2):
                                     if h_rec.get("OwnerTeam") == team_name and int(h_rec.get("HouseCount", 0) or 0) > 0:
                                         if int(h_rec.get("Tile", 0) or 0) == current_tile:
                                             house_on_current = (h_idx, int(h_rec.get("HouseCount", 0)))
-                                            break # Found the house on current tile, stop looking
+                                            break
                                         elif any_other_house is None:
                                             any_other_house = (h_idx, int(h_rec.get("HouseCount", 0)))
                                             
                                 house_count_col = list(house_records[0].keys()).index("HouseCount") + 1 if house_records else 0
                                 
                                 if house_on_current:
-                                    # Destroy house on current tile
                                     await asyncio.to_thread(self.cog.house_data_sheet.update_cell, house_on_current[0], house_count_col, 0)
                                     tax_msg = f"🏠 **Skip Tax:** You forfeited your property rights here. The house you built on Tile {current_tile} was instantly **destroyed**!"
                                 elif any_other_house:
-                                    # Remove 1 house from another tile
                                     new_count = any_other_house[1] - 1
                                     await asyncio.to_thread(self.cog.house_data_sheet.update_cell, any_other_house[0], house_count_col, new_count)
                                     tax_msg = "🏠 **Skip Tax:** Since you didn't have a house on this tile, the Bank **repossessed 1 house** from another property you own!"
                                 else:
-                                    # No houses at all
                                     tax_msg = "🏠 **Skip Tax:** You own zero houses, so the Bank couldn't repossess anything! (However, you permanently forfeit the right to build on this skipped tile)."
 
                                 bingo_embed = discord.Embed(
@@ -1236,7 +1203,6 @@ class MonopolyCog(commands.Cog):
                                 await team_chan.send(embed=roll_grant_embed)
                                 await self.cog.mirror_to_game_log(team_chan, embed=roll_grant_embed, team_name=team_name)
                     else:
-                        # Scavenger Boss - Grant Card (if they rolled it)
                         if scavenger_reward in ["Chest", "Chance"]:
                             if team_chan:
                                 scavenge_embed = discord.Embed(
@@ -1255,7 +1221,7 @@ class MonopolyCog(commands.Cog):
 
                 await interaction.followup.send("✅ Drop approved and logged.", ephemeral=True)
                 
-                # --- 💎 RARE DROP TABLE LOGIC ---
+                # --- RARE DROP TABLE ---
                 try:
                     rdt_chance = random.randint(1, 100)
                     if rdt_chance <= 10 and team_name != "*No team*":
@@ -1477,7 +1443,6 @@ class MonopolyCog(commands.Cog):
             await interaction.response.send_message("❌ You must provide an RSN.", ephemeral=True)
             return
 
-        # Slash param is required, but validate type to enforce screenshot/image uploads only.
         content_type = (getattr(screenshot, "content_type", None) or "").lower()
         filename = (getattr(screenshot, "filename", None) or "").lower()
         looks_like_image = content_type.startswith("image/") or filename.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
@@ -1502,8 +1467,6 @@ class MonopolyCog(commands.Cog):
             discord_id = str(interaction.user.id)
             screenshot_url = screenshot.url
 
-            # Append to the next row. If the sheet has a decorative title row, append_row will still
-            # place the submission after the last non-empty row.
             self.signup_sheet.append_row(
                 [discord_username, discord_id, rsn_clean, screenshot_url],
                 value_input_option="USER_ENTERED"
@@ -1517,7 +1480,6 @@ class MonopolyCog(commands.Cog):
                 else:
                     bingo_player_role = guild.get_role(BINGO_PLAYER_ROLE_ID)
                     if bingo_player_role is None:
-                        # Fallback by name in case the configured ID is stale.
                         bingo_player_role = discord.utils.get(guild.roles, name="Bingo Player")
                     if bingo_player_role is None:
                         role_status_line = f"\n**Role:** Not assigned (`Bingo Player` role not found by ID `{BINGO_PLAYER_ROLE_ID}`)."
@@ -1547,7 +1509,6 @@ class MonopolyCog(commands.Cog):
             )
             await interaction.followup.send(embed=success_embed, ephemeral=False)
 
-            # ---> UPDATED: Give Google Sheets 2.5 seconds to save, then refresh both boards <---
             async def delayed_list_update():
                 await asyncio.sleep(2.5)
                 if interaction.guild:
@@ -1582,28 +1543,26 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send("❌ You are not on a team.", ephemeral=True)
             return
             
-        # Move teleblock update to background
         await asyncio.to_thread(self.set_teleblock_status, team_name, "no")
         team_chan = self.get_team_channel(team_name)
 
-        # 1. Turn Reset Logic (Threaded)
+        # 1. Turn Reset
         try:
             cleared_cards = await asyncio.to_thread(self.clear_all_active_statuses, team_name)
             if cleared_cards and team_chan:
                 await team_chan.send(f"⌛️ **{team_name}**'s active status effects for: `({', '.join(cleared_cards)})` expired.")
             
-            # Combine these two flags into one threaded call if possible, or run them back-to-back
             await asyncio.to_thread(self.set_used_card_flag, team_name, "no")
             await asyncio.to_thread(self.set_bought_house_flag, team_name, "no")
 
-            # --- ADDED: Clear Random Event flags ---
+            # --- Clear Random Event ---
             asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "Silenced"))
             asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "Double Card"))
 
         except Exception as e:
             print(f"❌ Error during turn reset: {e}")
 
-        # 2. Fetch Team Data (ONE call, consolidated)
+        # 2. Fetch Team Data
         all_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
         headers = list(all_records[0].keys()) if all_records else []
         
@@ -1628,7 +1587,7 @@ class MonopolyCog(commands.Cog):
 
         raw_result = random.randint(1, 6)
         
-        # --- ADDED: Apply Pre-Roll Nerfs ---
+        # --- Apply Nerfs ---
         team_record = all_records[team_row_index-2]
         is_poisoned = str(team_record.get("Poisoned Roll", "no")).strip().lower() == "yes"
         is_halved = str(team_record.get("Roll Halved", "no")).strip().lower() == "yes"
@@ -1665,9 +1624,9 @@ class MonopolyCog(commands.Cog):
         await asyncio.to_thread(self.decrement_rolls_available, team_name)
 
         raw_pos = current_tile + result
-        new_pos = raw_pos % 40 # Assuming BOARD_SIZE is 40
+        new_pos = raw_pos % 40 # BOARD_SIZE
         
-        # ---> RESET SCAVENGER SLOT FOR THE NEW TILE <---
+        # --- RESET SCAVENGER SLOT ---
         self.team_scavenges_per_tile.pop(team_name, None)
         
         try:
@@ -1676,7 +1635,6 @@ class MonopolyCog(commands.Cog):
             sara_idx = headers.index("Scavenged Sarachnis") + 1
             titan_idx = headers.index("Scavenged Titans") + 1
             
-            # Wipe all 4 columns clean for the new tile
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, vork_idx, "")
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, dks_idx, "")
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, sara_idx, "")
@@ -1688,7 +1646,7 @@ class MonopolyCog(commands.Cog):
 
         go_message = ""
         
-        # 4. Standard Pass Go logic
+        # 4. Go logic
         if raw_pos >= 40 and new_pos != 30: 
             try:
                 pass_go_col = headers.index("Go Passes") + 1
@@ -1716,7 +1674,7 @@ class MonopolyCog(commands.Cog):
             except Exception as e:
                 print(f"❌ Error updating Pass Go: {e}")
 
-        # 5. Special Tile Handling (Gliders / Jail)
+        # 5. Special Tiles (Gliders / Jail)
         glider_message = ""
         
         if new_pos in (12, 28, 38):
@@ -1772,7 +1730,7 @@ class MonopolyCog(commands.Cog):
             go_message = "⛓️ **GO TO JAIL!** You are immediately sent to prison."
             await asyncio.to_thread(self.set_jail_status, team_name, "yes")
 
-        # 6. Update Position & Display Results
+        # 6. Update Position & Results
         pos_idx = headers.index("Position") + 1
         await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, pos_idx, new_pos)
         
@@ -1806,7 +1764,6 @@ class MonopolyCog(commands.Cog):
             await asyncio.to_thread(self.increment_rolls_available, team_name)
             roll_status_details.append("\n🎯 **BULLSEYE!** You landed directly on **GO** and earned a **Free Roll**!")
 
-        # Add the Glider explanation to the embed
         if glider_message:
             roll_status_details.append(f"\n{glider_message}")
 
@@ -1823,7 +1780,7 @@ class MonopolyCog(commands.Cog):
         if go_message:
             await interaction.channel.send(go_message)
 
-        # --- PASSIVE RANDOM EVENT ENGINE ---
+        # --- RANDOM EVENTS ---
         try:
             team_mult = float(all_records[team_row_index-2].get("Multiplier", 1))
         except ValueError:
@@ -1834,28 +1791,24 @@ class MonopolyCog(commands.Cog):
         event_triggered = False
         triggered_event = None
 
-        # ---> NEW: Do not trigger random events if landing on Tile 0 <---
         if new_pos not in (0, 2, 7, 17, 10, 30, 20, 12, 28, 38, 22, 33, 36) and random.randint(1, 100) <= spawn_chance:
             event_triggered = True
             
-            # Instantly fetch the event name AND the precise final tile from memory!
             event_result = await self.trigger_passive_random_event(interaction.channel, team_name, current_pos=new_pos)
             if event_result:
                 triggered_event, event_final_pos = event_result
                 if event_final_pos is not None:
                     final_pos = event_final_pos
 
-        # 7. POST-MOVE TRIGGERS
+        # 7. POST-MOVE
         tile_boss_map = self._get_tile_boss_map()
         
         pete_jailed = (event_triggered and final_pos == 10 and new_pos != 10)
         
         if final_pos in tile_boss_map:
-            # If they got sent to jail, NO boss drops!
             if not just_sent_to_jail and not pete_jailed:
                 await self.auto_post_show_drops_if_boss_tile(team_name, final_pos)
 
-        # Always process tile rewards (Chest/Chance/GO) on the final landing spot
         await self.check_and_award_card_on_land(team_name, final_pos, "rolling")
 
     def _get_tile_boss_map(self) -> dict[int, list[str]]:
@@ -1908,7 +1861,6 @@ class MonopolyCog(commands.Cog):
         except Exception:
             return intended_pos
 
-        # Card/teleport landings should trigger gliders if you land on them.
         if pos == 12:
             return 28
         if pos == 28:
@@ -2038,7 +1990,7 @@ class MonopolyCog(commands.Cog):
             col_idx = headers.index(column_name) + 1
             for idx, r in enumerate(records, start=2):
                 if r.get("Team", "").strip() == team_name:
-                    self.team_data_sheet.update_cell(idx, col_idx, "") # Clear the cell
+                    self.team_data_sheet.update_cell(idx, col_idx, "")
                     break
         except Exception as e:
             print(f"❌ Error clearing {column_name} flag for {team_name}: {e}")
@@ -2129,7 +2081,7 @@ class MonopolyCog(commands.Cog):
             )
             
             embed3 = discord.Embed(
-                title="Game Commands",
+                title="⚙️ Game Commands",
                 color=discord.Color.blue()
             )
             embed3.add_field(
@@ -2155,7 +2107,6 @@ class MonopolyCog(commands.Cog):
                 inline=False
             )
             
-            # Send all three embeds together
             await interaction.followup.send(embeds=[embed1, embed2, embed3], ephemeral=False)
         
         except Exception as e:
@@ -2205,7 +2156,6 @@ class MonopolyCog(commands.Cog):
     async def stats(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)
         try:
-            # 1. Fetch data snapshot concurrently (Prevents bot from hanging)
             records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             if not records:
                 await interaction.followup.send("❌ Team data is unavailable.", ephemeral=True)
@@ -2218,13 +2168,11 @@ class MonopolyCog(commands.Cog):
             for record in records:
                 team_name = record.get("Team", "")
                 if not team_name: 
-                    continue # Skip empty rows
+                    continue
                 
-                # Format GP
                 team_gp_str = str(record.get("GP", 0)).replace(',', '').strip()
                 team_gp = int(team_gp_str) if team_gp_str and team_gp_str.lstrip('-').isdigit() else 0
                 
-                # Format Go Passes
                 team_passes_str = str(record.get("Go Passes", 0)).replace(',', '').strip()
                 team_passes = int(team_passes_str) if team_passes_str and team_passes_str.lstrip('-').isdigit() else 0
                 
@@ -2289,7 +2237,7 @@ class MonopolyCog(commands.Cog):
             return
 
         try:
-            # 1. IMMEDIATE CHECK
+            # 1. CHECK
             bought_flag = await asyncio.to_thread(self.get_bought_house_flag, team_name)
             if bought_flag.strip().lower() in ["yes", "true", "1"]:
                 await interaction.followup.send("❌ You have already purchased a house this turn. Use `/roll` to move to a new tile before buying another.", ephemeral=True)
@@ -2297,11 +2245,10 @@ class MonopolyCog(commands.Cog):
             
             COST_MAP = {0: 25_000_000, 1: 50_000_000, 2: 100_000_000, 3: 200_000_000}
             
-            # 2. DATA FETCHING
+            # 2. DATA
             team_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             house_data = await asyncio.to_thread(self.house_data_sheet.get_all_records)
             
-            # Safely skip the header row if needed, though get_all_records usually handles it
             team_info = next((r for r in team_data if str(r.get("Team", "")).strip() == team_name.strip()), None)
             
             if not team_info:
@@ -2311,7 +2258,7 @@ class MonopolyCog(commands.Cog):
             current_pos = int(team_info.get("Position", -1))
             current_gp = int(str(team_info.get("GP", 0)).replace(",", ""))
             
-            # 3. HOUSE VALIDATION
+            # 3. HOUSE
             prop_index = -1
             prop_data = None
             for idx, row in enumerate(house_data, start=2):
@@ -2339,26 +2286,23 @@ class MonopolyCog(commands.Cog):
             # --- 💕 RING OF CHAROS CHECK ---
             has_charos = str(team_info.get("Ring of Charos", "no")).strip().lower() == "yes"
             if has_charos:
-                cost = cost // 2  # Apply 50% discount
+                cost = cost // 2
 
             if current_gp < cost:
                 await interaction.followup.send(f"❌ Not enough GP. Need **{cost:,}**, but you have **{current_gp:,}**.", ephemeral=True)
                 return
 
-            # 4. EXECUTE PURCHASE & SET LOCK FLAG
+            # 4. EXECUTE
             headers = list(team_data[0].keys())
             gp_col = headers.index("GP") + 1
             team_row_in_sheet = team_data.index(team_info) + 2
 
-            # Perform the updates
             await asyncio.to_thread(self.house_data_sheet.update_cell, prop_index, 3, team_name) 
             await asyncio.to_thread(self.house_data_sheet.update_cell, prop_index, 4, house_count + 1) 
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_in_sheet, gp_col, current_gp - cost)
 
-            # --> NEW: Sync the Houses Owned column (Column M) <--
             await asyncio.to_thread(self.sync_houses_owned, team_name)
             
-            # ---> THE FIX: Set the lock flag to "yes" ONLY after a successful purchase <---
             await asyncio.to_thread(self.set_bought_house_flag, team_name, "yes")
 
             charos_msg = ""
@@ -2433,7 +2377,7 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send(content=f"❌ Your team is on Tile **{current_tile}**, which does not have any boss drops.", ephemeral=True)
             return
 
-        # 3. Route to the correct UI
+        # 3. Route UI
         warning_text = (
             "⚠️ **Notice:** Submitting a drop here locks you into the **Main Fighter** role for this tile.\n"
             "You will **NOT** be able to use `/scavenge` for off-board bosses until your team moves to a new tile.\n\n"
@@ -2471,7 +2415,6 @@ class MonopolyCog(commands.Cog):
         """Checks if a player is allowed to use the requested command type on the current tile."""
         data = self.player_stances.get(user_id)
         
-        # If they have a saved stance AND their team is still on the exact same tile
         if data and data["team"] == team_name and data["tile"] == current_tile:
             if data["stance"] != requested_stance:
                 other_cmd = "/scavenge" if requested_stance == "main" else "/submitdrop"
@@ -2507,7 +2450,6 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send(content=f"❌ **{submitted_for.display_name}** is not on a team.", ephemeral=True)
             return
 
-        # 1. Fetch current tile
         current_tile = None
         records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
         for record in records:
@@ -2519,10 +2461,8 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send(content=f"❌ Could not find data for **{team_name}**.", ephemeral=True)
             return
 
-        # ---> NEW: SCAVENGER BINGO PROGRESS CHECK <---
         tracker = self.team_scavenges_per_tile.get(team_name, {"tile": -1, "bosses": []})
         
-        # Safety catch in case old integer data is still in the bot's memory
         if isinstance(tracker, int):
             tracker = {"tile": tracker, "bosses": []}
             
@@ -2533,13 +2473,11 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send(content=f"❌ **{team_name}** has already scavenged all 4 bosses for Tile {current_tile} and earned their Free Roll! You must wait until your team moves.", ephemeral=True)
             return
             
-        # Dual-Box Check (Per Turn/Tile)
         allowed, error_msg = self.check_turn_stance(submitted_for.id, team_name, current_tile, "scavenge")
         if not allowed:
             await interaction.followup.send(content=error_msg, ephemeral=True)
             return
 
-        # ---> DYNAMIC SCAVENGE WARNING LOGIC <---
         current_scavenges = len(completed_bosses)
         
         if current_scavenges == 3:
@@ -2567,7 +2505,7 @@ class MonopolyCog(commands.Cog):
                 submitting_user=interaction.user,
                 submitted_for=submitted_for,
                 screenshot_url=screenshot.url,
-                valid_bosses=available_bosses, # <--- Only shows un-killed bosses!
+                valid_bosses=available_bosses,
                 current_tile=current_tile
             ),
             ephemeral=True
@@ -2576,11 +2514,9 @@ class MonopolyCog(commands.Cog):
     async def team_receives_card(self, team_name: str, card_type: str, team_channel: discord.TextChannel):
         card_sheet = self.chance_sheet if card_type == "Chance" else self.chest_sheet
         try:
-            # 1. Fetch all records asynchronously
             rows = await asyncio.to_thread(card_sheet.get_all_records)
             team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             
-            # Check if they already have ANY passive active
             team_info = next((r for r in team_records if r.get("Team") == team_name), {})
             has_protect_item = str(team_info.get("Protect Item", "no")).strip().lower() == "yes"
             has_recoil = str(team_info.get("Ring of Recoil", "no")).strip().lower() == "yes"
@@ -2588,10 +2524,8 @@ class MonopolyCog(commands.Cog):
             has_charos = str(team_info.get("Ring of Charos", "no")).strip().lower() == "yes"
             has_stone = str(team_info.get("Ring of Stone", "no")).strip().lower() == "yes"
             
-            # ---> THE 1-PASSIVE LIMIT <---
             has_any_passive = has_protect_item or has_recoil or has_phoenix or has_charos or has_stone
 
-            # 2. Build the Deck
             eligible_cards = []
             if rows:
                 for i, row in enumerate(rows, start=2):
@@ -2607,7 +2541,6 @@ class MonopolyCog(commands.Cog):
                             "teams_holding": teams_holding
                         })
 
-            # ---> INJECT THE VIRTUAL PASSIVES (Only if they have NONE) <---
             if not has_any_passive:
                 eligible_cards.append({"type": "virtual", "data": {"Name": "Protect Item", "Card Text": "Passive - Can't be used. Saves a player from item losses until one occurs."}})
                 eligible_cards.append({"type": "virtual", "data": {"Name": "Ring of Recoil", "Card Text": "Passive - Dealing with you has a price. Attacking this team causes the effect to trigger on both teams."}})
@@ -2619,13 +2552,11 @@ class MonopolyCog(commands.Cog):
                 await team_channel.send(f"❗ **{team_name}** tried to draw a {card_type} card, but they already hold every available card in the deck!")
                 return
 
-            # 3. Pick a random eligible card
             chosen_card = random.choice(eligible_cards)
             card_data = chosen_card["data"]
             card_name = card_data.get("Name", "Unknown Card")
             card_text = card_data.get("Card Text", "")
             
-            # Custom display name for flavor
             display_name = "Protect Item Scroll" if card_name == "Protect Item" else ("Ring of Charos (a)" if card_name == "Ring of Charos" else card_name)
             
             if card_name == "Ring of Recoil":
@@ -2641,13 +2572,10 @@ class MonopolyCog(commands.Cog):
             else:
                 card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "🃏"))
             
-            # 4. Handle based on type
             if chosen_card["type"] == "virtual":
-                # --- VIRTUAL CARD LOGIC (PASSIVES) ---
                 team_row_idx = team_records.index(team_info) + 2
                 headers = list(team_records[0].keys()) if team_records else []
                 
-                # Dynamically update whichever passive they drew
                 if card_name in headers:
                     passive_col = headers.index(card_name) + 1
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, passive_col, "yes")
@@ -2659,7 +2587,6 @@ class MonopolyCog(commands.Cog):
                 )
                 await team_channel.send(embed=embed)
                 
-                # Send specific confirmation messages
                 if card_name == "Protect Item":
                     await team_channel.send(f"<:inventory:1437979836881703074> **{team_name}** drew a **Protect Item Scroll**!\nThe prayer is now **ACTIVE** in your inventory and will automatically block the next effect that steals your GP or cards!")
                 elif card_name == "Ring of Recoil":
@@ -2672,12 +2599,10 @@ class MonopolyCog(commands.Cog):
                     await team_channel.send(f"🪨 **{team_name}** drew a **Ring of Stone**!\nThe ring is now **ACTIVE** in your inventory and will prevent the next card effect that tries to move or teleport you!")
 
             else:
-                # --- PHYSICAL CARD LOGIC ---
                 card_row_index = chosen_card["index"]
                 teams_holding = chosen_card["teams_holding"]
                 new_roll = None
 
-                # Handle Wildcards (Dice Rolls inside cards)
                 if "%d6" in card_text or "%d3" in card_text:
                     if "%d6" in card_text:
                         new_roll = random.randint(1, 6)
@@ -2692,11 +2617,9 @@ class MonopolyCog(commands.Cog):
                     wildcard_data[team_name] = new_roll
                     await asyncio.to_thread(card_sheet.update_cell, card_row_index, 4, json.dumps(wildcard_data))
 
-                # Append team to 'Held By Team'
                 teams_holding.append(team_name)
                 await asyncio.to_thread(card_sheet.update_cell, card_row_index, 3, ", ".join(teams_holding))
 
-                # Format output
                 card_text_display = card_text
                 if new_roll is not None:
                     card_text_display = card_text_display.replace("%d6", str(new_roll)).replace("%d3", str(new_roll))
@@ -3186,13 +3109,11 @@ class MonopolyCog(commands.Cog):
         is_in_jail = await asyncio.to_thread(self.get_jail_status, team_name)
         is_just_visiting = (new_pos == JAIL_TILE and is_in_jail == "no")
 
-        # 1. Roll Protection Logic
         if new_pos in ROLL_GRANTING_TILES or is_just_visiting:
             try:
                 rolls_available = self.get_team_rolls(team_name)
                 
                 if rolls_available <= 0:
-                    # We update the sheet first
                     self.increment_rolls_available(team_name)
                     
                     try:
@@ -3214,13 +3135,10 @@ class MonopolyCog(commands.Cog):
             except Exception as e:
                 print(f"❌ Error during roll protection check: {e}")
 
-        # 2. Chest & Chance Triggers
-        # Chest Emoji
         if new_pos in CHEST_TILES:
             print(f"📦 {team_name} triggered CHEST on tile {new_pos}")
             await self.team_receives_card(team_name, "Chest", team_channel)
             
-        # Chance Emoji
         elif new_pos in CHANCE_TILES:
             print(f"❓ {team_name} triggered CHANCE on tile {new_pos}")
             await self.team_receives_card(team_name, "Chance", team_channel)
@@ -3242,7 +3160,6 @@ class MonopolyCog(commands.Cog):
         chest_cards = self.get_held_cards(self.chest_sheet, team_name)
         chance_cards = self.get_held_cards(self.chance_sheet, team_name)
 
-        # 1. Fetch Team Data for Passives status
         try:
             records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             team_record = next((r for r in records if str(r.get("Team", "")).strip().lower() == team_name.strip().lower()), {})
@@ -3255,7 +3172,6 @@ class MonopolyCog(commands.Cog):
             print(f"❌ Error fetching passives status: {e}")
             is_protected, has_recoil, has_phoenix, has_charos, has_stone = False, False, False, False, False
 
-        # 2. Check if the inventory is completely empty
         if not chest_cards and not chance_cards and not is_protected and not has_recoil and not has_phoenix and not has_charos and not has_stone:
             await interaction.followup.send("❌ Your team holds no cards and has no active passives.", ephemeral=True)
             return
@@ -3266,7 +3182,6 @@ class MonopolyCog(commands.Cog):
             description="Active passives and held items:"
         )
 
-        # --- PASSIVES SECTION (TOP, NO INDEX) ---
         passives_text = ""
         if is_protected:
             passives_text += "<:inventory:1437979836881703074> **Protect Item**\n*This prayer is active and will automatically block the next effect that steals your GP or cards.*\n\n"
@@ -3344,7 +3259,6 @@ class MonopolyCog(commands.Cog):
             return
 
         try:
-            # 1. Fetch team data so team_info exists!
             all_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             team_info = next((r for r in all_records if r.get("Team") == team_name), None)
             
@@ -3352,13 +3266,11 @@ class MonopolyCog(commands.Cog):
                 await interaction.followup.send(f"❌ Could not find data for **{team_name}**.", ephemeral=True)
                 return
 
-            # 2. Check if silenced by the Mime
             is_silenced = str(team_info.get("Silenced", "no")).strip().lower()
             if is_silenced == "yes":
                 await interaction.followup.send("❌ 🎭 **You are Silenced!** The Mime's aura prevents you from using any cards. You must roll the dice to break the silence.", ephemeral=True)
                 return
             
-           # 3. Check normal card limits (Double Card Logic)
             has_double_card = str(team_info.get("Double Card", "no")).strip().lower() == "yes"
             used_card_flag = str(team_info.get("Used Card This Turn", "no")).strip().lower()
             
@@ -3372,10 +3284,8 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ You can only use one card per turn. Roll again to use another card.", ephemeral=True)
                     return
             else:
-                # This is their FIRST card use. 
                 if has_double_card:
                     double_card_note = "\n\n🃏 **Double Cards Active!** You still have **1** more card use available this turn!"
-                    # We DO NOT clear the flag yet; they still have one use left.
                 
         except Exception as e:
             print(f"❌ Error checking team status flags: {e}")
@@ -3486,7 +3396,6 @@ class MonopolyCog(commands.Cog):
             elif card_name == "Vile Vigour" and isinstance(team_wildcard_value, int):
                 stored_roll = team_wildcard_value
                 
-                # Fetch snapshot
                 all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
                 caster_pos = -1
                 team_row_idx = -1
@@ -3500,7 +3409,6 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
                     return
 
-                # Calculate movement and check for GO crossing
                 raw_new_pos = caster_pos + stored_roll
                 intended_pos = raw_new_pos % BOARD_SIZE
                 new_pos = self.resolve_nonroll_landing_tile(intended_pos)
@@ -3540,10 +3448,8 @@ class MonopolyCog(commands.Cog):
                     
                     opponent_pos = int(record.get("Position", -1))
                     
-                    # Calculate distance, wrapping around GO
                     dist = (opponent_pos - caster_pos) % BOARD_SIZE
                     
-                    # Only target if they are 1 to 12 tiles ahead
                     if 1 <= dist <= 12:
                         opponents_ahead.append((opponent_team_name, opponent_pos, dist))
                 
@@ -3551,11 +3457,9 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ Card effect failed: No opponents are within 12 tiles ahead of you.", ephemeral=True)
                     return 
 
-                # Sort by distance to find the closest opponent
                 sorted_opponents = sorted(opponents_ahead, key=lambda x: x[2])
                 closest_dist = sorted_opponents[0][2]
                 
-                # Handle ties randomly if multiple teams are on the same closest tile
                 closest_teams = [opp for opp in sorted_opponents if opp[2] == closest_dist]
                 chosen_target = random.choice(closest_teams)
                 
@@ -3650,7 +3554,7 @@ class MonopolyCog(commands.Cog):
 
                 # 3. Execution
                 await asyncio.to_thread(self.increment_rolls_available, team_name)
-                # Clear the jail status after a successful escape
+                # Clear
                 await asyncio.to_thread(self.set_jail_status, team_name, "no")
                 
                 embed_description = "> 🎲 You have used your crystal to escape! You gained a free roll."
@@ -3818,7 +3722,6 @@ class MonopolyCog(commands.Cog):
             elif card_name == "Backstab" and isinstance(team_wildcard_value, int):
                 stored_roll = team_wildcard_value
                 
-                # Fetch a fast snapshot of the data
                 all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
                 caster_pos = -1
                 opponents_ahead = []
@@ -3850,11 +3753,9 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ Card effect failed: No opponents are within 5 tiles ahead of you.", ephemeral=True)
                     return 
 
-                # Sort by distance to find the closest opponent
                 sorted_opponents = sorted(opponents_ahead, key=lambda x: x[2])
                 closest_dist = sorted_opponents[0][2]
                 
-                # Handle ties randomly if multiple teams are on the same closest tile
                 closest_teams = [opp for opp in sorted_opponents if opp[2] == closest_dist]
                 chosen_target = random.choice(closest_teams)
                 
@@ -3899,10 +3800,8 @@ class MonopolyCog(commands.Cog):
                 
                 # 2. Check Vengeance (Rebound)
                 elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
-                    # Caster gets hit. Does the CASTER have an Elder Maul?
                     elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name) 
                     
-                    # Halve the effect if Maul is active
                     final_roll_val = (stored_roll // 2) if elder_maul_active else stored_roll
                     maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
                     
@@ -3946,10 +3845,8 @@ class MonopolyCog(commands.Cog):
                 
                 # 3. Normal Hit
                 else:
-                    # Target gets hit. Does the TARGET have an Elder Maul?
                     elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
                     
-                    # Halve the effect if Maul is active
                     final_roll_val = (stored_roll // 2) if elder_maul_active else stored_roll 
                     maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
                     
@@ -3988,7 +3885,6 @@ class MonopolyCog(commands.Cog):
                 stored_roll = team_wildcard_value
                 move_amount = -stored_roll
                 
-                # Fetch a fast snapshot of the data
                 all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
                 caster_pos = -1
                 targets = []
@@ -3999,7 +3895,6 @@ class MonopolyCog(commands.Cog):
                         break
                 
                 if caster_pos != -1:
-                    # Target array logic (Same logic used for Smite to wrap around Go)
                     target_tiles = [caster_pos - 1, caster_pos, caster_pos + 1]
                     if caster_pos == 0: 
                         target_tiles = [0, 1, BOARD_SIZE - 1] 
@@ -4013,7 +3908,6 @@ class MonopolyCog(commands.Cog):
                         
                         opp_pos = int(record.get("Position", -1))
                         if opp_pos in target_tiles:
-                            # Save both their name AND their actual position
                             targets.append((opponent_team_name, opp_pos))
                 
                 if not targets:
@@ -4021,7 +3915,6 @@ class MonopolyCog(commands.Cog):
                     return 
 
                 embed_description = ""
-                # Now we unpack both the team AND their correct tile position
                 for target_team, target_pos in targets:
                     victim_channel = self.get_team_channel(target_team)
                     
@@ -4062,10 +3955,8 @@ class MonopolyCog(commands.Cog):
 
                     # 2. Check Vengeance (Rebound)
                     elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
-                        # Caster gets hit. Does the CASTER have an Elder Maul?
                         elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name) 
                         
-                        # Halve the effect if Maul is active
                         final_move_amount = -(stored_roll // 2) if elder_maul_active else move_amount
                         maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
                         
@@ -4111,14 +4002,11 @@ class MonopolyCog(commands.Cog):
                     
                     # 3. Normal Hit
                     else:
-                        # Target gets hit. Does the TARGET have an Elder Maul?
                         elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
                         
-                        # Halve the effect if Maul is active
                         final_move_amount = -(stored_roll // 2) if elder_maul_active else move_amount
                         maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
                         
-                        # Use their actual target_pos calculated above instead of rewriting it to the caster's pos
                         intended_target_pos = max(0, target_pos + final_move_amount)
                         new_pos = self.resolve_nonroll_landing_tile(intended_target_pos)
                         glider_note = self.get_glider_redirect_note(intended_target_pos, new_pos)
@@ -4152,7 +4040,6 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("<:teleblock:1438088930816819271> You are Teleblocked! You cannot use this card.", ephemeral=True)
                     return 
 
-                # Fetch snapshot
                 all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
                 caster_pos = -1
                 for record in all_teams_data:
@@ -4243,20 +4130,15 @@ class MonopolyCog(commands.Cog):
                 min_distance = float('inf')
                 passed_go_on_tele = False
 
-                # ---> NEW: Circular distance calculation <---
                 for house in houses:
                     house_tile = int(house.get("tile", 0))
                     
-                    # Calculate forward distance, wrapping around the 40-tile board
                     distance = (house_tile - caster_pos) % BOARD_SIZE
                     
-                    # 🛡️ FIX: Exclude distance 0 (their current tile)
                     if 0 < distance < min_distance:
                         min_distance = distance
                         closest_house_pos = house_tile
 
-                # If the destination tile number is lower than the current tile number, 
-                # they must have crossed 0 to get there.
                 if closest_house_pos != -1 and closest_house_pos < caster_pos:
                     passed_go_on_tele = True
 
@@ -4309,11 +4191,9 @@ class MonopolyCog(commands.Cog):
                     
                     opponent_pos = int(record.get("Position", -1))
                     
-                    # Calculate shortest circular distance (handles wrapping around GO)
                     dist = abs(opponent_pos - caster_pos)
                     shortest_dist = min(dist, BOARD_SIZE - dist)
                     
-                    # Target must be between 1 and 10 tiles away (front OR back)
                     if 1 <= shortest_dist <= 10:
                         valid_opponents.append({
                             "team": opponent_team_name, 
@@ -4325,7 +4205,6 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ Card effect failed: No opponents are within 10 tiles of you.", ephemeral=True)
                     return 
 
-                # It's random, so pick one of the valid targets
                 chosen_target = random.choice(valid_opponents)
                 target_team = chosen_target["team"]
                 target_pos = chosen_target["pos"]
@@ -4615,14 +4494,12 @@ class MonopolyCog(commands.Cog):
                 card_sheet = extra_data.get("card_sheet")
                 card_row = extra_data.get("card_row")
                 
-                # Filter out the Rogue's Gloves card they just used so it can't be given away
                 other_caster_cards = [
                     c for c in all_caster
                     if not ( (c in caster_chest and card_sheet == self.chest_sheet and c["row_index"] == card_row) or 
                              (c in caster_chance and card_sheet == self.chance_sheet and c["row_index"] == card_row) )
                 ]
                 
-                # 🛑 Caster Guard - Must have ANOTHER card besides Rogue's Gloves!
                 if not other_caster_cards:
                     embed_description += f"> 💍 **{victim_team}** has a **Ring of Recoil**! The Steal failed because **{team_name}** has no other cards to lose to the recoil."
                     if victim_channel:
@@ -4632,7 +4509,6 @@ class MonopolyCog(commands.Cog):
                 else:
                     await self.consume_recoil(victim_team)
                     
-                    # Caster gives to Victim (One-Way Transfer)
                     stolen_from_caster = random.choice(other_caster_cards)
                     c_sheet = self.chest_sheet if stolen_from_caster in caster_chest else self.chance_sheet
                     c_row = stolen_from_caster["row_index"]
@@ -4772,7 +4648,6 @@ class MonopolyCog(commands.Cog):
                 
                 steal_amount = max(1, int(highest_gp * (0.10 if maul_active else base_percent)))
                 
-                # 🛑 Caster Guard
                 if caster_gp < steal_amount:
                     embed_description += f"> 💍 **{target_team}** has a **Ring of Recoil**! The Pickpocket failed because **{team_name}** did not have enough GP to afford the recoil damage."
                     if victim_channel:
@@ -4835,7 +4710,6 @@ class MonopolyCog(commands.Cog):
             
             non_active_cards = [card for card in all_victim_cards if "(ACTIVE)" not in card['text']]
 
-            # ---> NEW: HARD GUARD CLAUSE <---
             if not non_active_cards:
                 embed_description = f"<:smite:1437979867084881950> **{team_name}** tried to Smite **{victim_team}**, but they have no removable cards left!"
                 if victim_channel:
@@ -5546,7 +5420,6 @@ class MonopolyCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            # Trigger the event and pass the requested ID directly to the engine
             await self.trigger_passive_random_event(team_chan, team_name, forced_event=event_id)
             await interaction.followup.send(f"✅ Successfully forced the `{event_id}` event for **{team_name}** in their channel.")
         except Exception as e:
@@ -5554,407 +5427,16 @@ class MonopolyCog(commands.Cog):
 
     @force_event.autocomplete('event_id')
     async def force_event_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        # All valid internal IDs
         events = [
             "dwarf", "whirlpool", "ents", "gravedigger", "sandwich", "jekyll", "demon", "plant", 
             "beekeeper", "mime", "maze", "pete", "bob", "twin",
             "certers", "arnav", "oldman", "frog", "countcheck", "exam", "genie", "postie", 
             "pinball", "sandwich_good", "turpentine", "quiz"
         ]
-        # Return matches based on what the user has typed so far (Caps at 25 results to obey Discord limits)
         return [
             app_commands.Choice(name=event, value=event)
             for event in events if current.lower() in event.lower()
         ][:25]
-    
-    @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
-        """Listens for manual Discord role changes and updates the team list automatically."""
-        if before.roles == after.roles:
-            return
-
-        before_teams = set(r.name for r in before.roles if r.name in ACTIVE_TEAMS)
-        after_teams = set(r.name for r in after.roles if r.name in ACTIVE_TEAMS)
-
-        if before_teams != after_teams:
-            print(f"🔄 Role change detected for {after.display_name}. Updating live team list...")
-            
-            await asyncio.sleep(3.0)
-            
-            try:
-                await after.guild.fetch_member(after.id)
-            except discord.HTTPException:
-                pass
-                
-            await self.update_live_team_list(after.guild)
-    
-    def get_team_captain(self, guild: discord.Guild, team_name: str) -> Optional[discord.Member]:
-        """Dynamically finds the Captain of a specific team by checking roles."""
-        team_role = discord.utils.get(guild.roles, name=team_name)
-        if not team_role:
-            return None
-            
-        for member in team_role.members:
-            if self.has_event_captain_role(member):
-                return member
-        return None
-
-    async def get_team_capacity_limits(self, guild: discord.Guild) -> dict:
-        """Calculates team caps, permanently hardcoded to a maximum of 19 players."""
-        capacity_data = {}
-        
-        for team_name in ACTIVE_TEAMS:
-            role = discord.utils.get(guild.roles, name=team_name)
-            current_size = len(role.members) if role else 0
-            
-            capacity_data[team_name] = {
-                "current": current_size,
-                "max": 20,
-                "is_full": current_size >= 20
-            }
-            
-        return capacity_data
-            
-    class CaptainApprovalView(ui.View):
-        def __init__(self, cog, target_member: discord.Member, team_name: str):
-            super().__init__(timeout=None)
-            self.cog = cog
-            self.target_member = target_member
-            self.team_name = team_name
-
-        async def interaction_check(self, interaction: discord.Interaction) -> bool:
-            # Dynamically verify the clicker is the captain of THIS team
-            if not self.cog.has_event_captain_role(interaction.user):
-                await interaction.response.send_message("❌ Only Captains can use this button.", ephemeral=True)
-                return False
-            if self.cog.get_team(interaction.user) != self.team_name:
-                await interaction.response.send_message(f"❌ You are not the captain of {self.team_name}.", ephemeral=True)
-                return False
-            return True
-
-        @ui.button(label="Accept Player", style=discord.ButtonStyle.success, custom_id="cap_accept")
-        async def accept(self, interaction: discord.Interaction, button: ui.Button):
-            role = discord.utils.get(interaction.guild.roles, name=self.team_name)
-            if role:
-                await self.target_member.add_roles(role, reason="Captain accepted team request")
-                
-                # ---> ADDED: Update the live roster message <---
-                await self.cog.update_live_team_list(interaction.guild)
-                
-                embed = interaction.message.embeds[0]
-                embed.color = discord.Color.green()
-                embed.title = "✅ Request Accepted"
-                embed.description = f"**{self.target_member.mention}** is now on **{self.team_name}**!"
-                
-                for child in self.children:
-                    child.disabled = True
-                await interaction.response.edit_message(embed=embed, view=self)
-            else:
-                await interaction.response.send_message(f"❌ Could not find the {self.team_name} role.", ephemeral=True)
-
-        @ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="cap_deny")
-        async def deny(self, interaction: discord.Interaction, button: ui.Button):
-            embed = interaction.message.embeds[0]
-            embed.color = discord.Color.red()
-            embed.title = "❌ Request Denied"
-            embed.description = f"The request for **{self.target_member.mention}** to join was denied."
-            
-            for child in self.children:
-                child.disabled = True
-            await interaction.response.edit_message(embed=embed, view=self)
-
-    class PlayerAcceptView(ui.View):
-        def __init__(self, cog, target_member: discord.Member, captain_member: discord.Member, team_name: str):
-            super().__init__(timeout=None)
-            self.cog = cog
-            self.target_member = target_member
-            self.captain_member = captain_member
-            self.team_name = team_name
-
-        async def interaction_check(self, interaction: discord.Interaction) -> bool:
-            if interaction.user.id != self.target_member.id:
-                await interaction.response.send_message("❌ This invite is not for you.", ephemeral=True)
-                return False
-            return True
-
-        @ui.button(label="Accept Invite", style=discord.ButtonStyle.success, custom_id="player_accept")
-        async def accept(self, interaction: discord.Interaction, button: ui.Button):
-            role = discord.utils.get(interaction.guild.roles, name=self.team_name)
-            if role:
-                await self.target_member.add_roles(role, reason="Player accepted captain's invite")
-                
-                # ---> ADDED: Update the live roster message <---
-                await self.cog.update_live_team_list(interaction.guild)
-                
-                embed = interaction.message.embeds[0]
-                embed.color = discord.Color.green()
-                embed.title = "✅ Invite Accepted"
-                embed.description = f"**{self.target_member.mention}** has joined **{self.team_name}**!"
-                
-                for child in self.children:
-                    child.disabled = True
-                await interaction.response.edit_message(embed=embed, view=self)
-            else:
-                await interaction.response.send_message(f"❌ Could not find the {self.team_name} role.", ephemeral=True)
-
-        @ui.button(label="Decline", style=discord.ButtonStyle.danger, custom_id="player_deny")
-        async def deny(self, interaction: discord.Interaction, button: ui.Button):
-            embed = interaction.message.embeds[0]
-            embed.color = discord.Color.red()
-            embed.title = "❌ Invite Declined"
-            embed.description = f"**{self.target_member.mention}** declined the invite to {self.team_name}."
-            
-            for child in self.children:
-                child.disabled = True
-            await interaction.response.edit_message(embed=embed, view=self)
-
-    class TeamSelectionView(ui.View):
-        def __init__(self, cog, guild: discord.Guild):
-            # timeout=None ensures the buttons never expire so anyone can click them anytime!
-            super().__init__(timeout=None)
-            self.cog = cog
-            
-            for team in ACTIVE_TEAMS:
-                captain = self.cog.get_team_captain(guild, team)
-                # Use Captain's display name if found, otherwise default to Team name
-                cap_name = captain.display_name if captain else team
-                
-                # Button is always clickable and only shows the Captain's name
-                btn = ui.Button(
-                    label=cap_name,
-                    style=discord.ButtonStyle.primary,
-                    custom_id=f"req_{team}"
-                )
-                btn.callback = self.make_callback(team, captain, cap_name)
-                self.add_item(btn)
-
-        def make_callback(self, team_name, captain: discord.Member, cap_name: str):
-            async def callback(interaction: discord.Interaction):
-                # 1. Check if the clicker is already on a team
-                current_team = self.cog.get_team(interaction.user)
-                if current_team:
-                    await interaction.response.send_message(f"❌ You are already on **{current_team}**!", ephemeral=True)
-                    return
-                
-                # 2. Check the capacity dynamically AT THE TIME of the click
-                capacities = await self.cog.get_team_capacity_limits(interaction.guild)
-                team_cap_data = capacities.get(team_name, {"is_full": False})
-                
-                if team_cap_data["is_full"]:
-                    # Private error sent only to the person who clicked
-                    await interaction.response.send_message(f"❌ **Action Denied:** {cap_name}'s team is currently at maximum capacity.", ephemeral=True)
-                    return
-                
-                # 3. Success! Send the request to the Captain
-                request_channel = self.cog.bot.get_channel(TEAM_REQUEST_CHANNEL_ID)
-                if request_channel:
-                    embed = discord.Embed(
-                        title="📥 New Team Request",
-                        description=f"**{interaction.user.mention}** has requested to join **{team_name}**!",
-                        color=discord.Color.blue()
-                    )
-                    view = self.cog.CaptainApprovalView(self.cog, interaction.user, team_name)
-                    
-                    ping_text = captain.mention if captain else f"Attention {team_name} Captain!"
-                    await request_channel.send(content=ping_text, embed=embed, view=view)
-                    
-                    await interaction.response.send_message(f"✅ Request sent to **{cap_name}**!", ephemeral=True)
-                else:
-                    await interaction.response.send_message("❌ Team request channel not found.", ephemeral=True)
-            return callback
-
-    @app_commands.command(name="team_request", description="Post a public team request board.")
-    async def team_request(self, interaction: discord.Interaction):
-        # Make the panel public so everyone can see and click the buttons
-        await interaction.response.defer(ephemeral=False)
-        
-        embed = discord.Embed(
-            title="🤝 Join a Team",
-            description="Click a Captain below to send them a request to join their team. If their team is full, the bot will let you know!",
-            color=discord.Color.blurple()
-        )
-        
-        view = self.TeamSelectionView(self, interaction.guild)
-        await interaction.followup.send(embed=embed, view=view)
-
-    @app_commands.command(name="team_request_refresh", description="Refresh the team request buttons on an existing message.")
-    @app_commands.describe(message_id="The ID of the team request message to update")
-    async def team_request_refresh(self, interaction: discord.Interaction, message_id: str):
-        if not self.has_event_staff_role(interaction.user):
-            await interaction.response.send_message("❌ Only Event Staff can use this.", ephemeral=True)
-            return
-            
-        await interaction.response.defer(ephemeral=True)
-            
-        try:
-            msg_id_int = int(message_id.strip())
-            # Fetch the message from the channel the command was used in
-            msg = await interaction.channel.fetch_message(msg_id_int)
-            
-            # Rebuild the embed to match the original
-            embed = discord.Embed(
-                title="🤝 Join a Team",
-                description="Click a Captain below to send them a request to join their team. If their team is full, the bot will let you know!",
-                color=discord.Color.blurple()
-            )
-            
-            # Generate a fresh View. This re-hooks the buttons to the bot's memory 
-            # and pulls the most up-to-date Captain names for the button labels!
-            view = self.TeamSelectionView(self, interaction.guild)
-            
-            # Apply the fresh view and embed to the old message
-            await msg.edit(embed=embed, view=view)
-            
-            await interaction.followup.send("✅ Successfully refreshed the team request buttons!", ephemeral=True)
-            
-        except discord.NotFound:
-            await interaction.followup.send(
-                "❌ Message not found. You must run this command in the **exact same channel** as the target message.", 
-                ephemeral=True
-            )
-        except ValueError:
-            await interaction.followup.send("❌ Invalid message ID format. Please provide a valid numeric ID.", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Error refreshing message: {e}", ephemeral=True)
-    
-    @app_commands.command(name="player_request", description="[Captains Only] Request a player to join your team.")
-    @app_commands.describe(player="The player you want to invite to your team")
-    async def player_request(self, interaction: discord.Interaction, player: discord.Member):
-        if not self.has_event_captain_role(interaction.user):
-            await interaction.response.send_message("❌ Only Event Captains can use this command.", ephemeral=True)
-            return
-            
-        await interaction.response.defer(ephemeral=True)
-        
-        captain_team = self.get_team(interaction.user)
-        if not captain_team:
-            await interaction.followup.send("❌ You are a captain, but you don't have a team role assigned yet!", ephemeral=True)
-            return
-
-        target_team = self.get_team(player)
-        if target_team:
-            await interaction.followup.send(f"❌ **{player.display_name}** is already on **{target_team}**.", ephemeral=True)
-            return
-
-        capacities = await self.get_team_capacity_limits(interaction.guild)
-        team_cap_data = capacities.get(captain_team)
-        
-        if team_cap_data and team_cap_data["is_full"]:
-            await interaction.followup.send(f"❌ **Action Denied:** Your team is at its maximum capacity ({team_cap_data['max']} players).", ephemeral=True)
-            return
-
-        request_channel = self.bot.get_channel(TEAM_REQUEST_CHANNEL_ID)
-        if not request_channel:
-            await interaction.followup.send("❌ Team request channel not found.", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="💌 You've been drafted!",
-            description=f"**{interaction.user.mention}** wants you to join **{captain_team}**!\n\nDo you accept?",
-            color=discord.Color.gold()
-        )
-        
-        view = self.PlayerAcceptView(self, player, interaction.user, captain_team)
-        await request_channel.send(content=f"{player.mention}", embed=embed, view=view)
-        
-        await interaction.followup.send(f"✅ An invite has been sent to **{player.display_name}** in <#{TEAM_REQUEST_CHANNEL_ID}>.", ephemeral=True)
-    
-    @app_commands.command(name="team_list", description="Post a live-updating roster of all teams.")
-    async def team_list(self, interaction: discord.Interaction):
-        if not self.has_event_staff_role(interaction.user):
-            await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=False)
-        
-        capacities = await self.get_team_capacity_limits(interaction.guild)
-        embed = self.build_team_list_embed(interaction.guild, capacities)
-        
-        msg = await interaction.followup.send(embed=embed)
-        self.save_team_list_config(interaction.channel_id, msg.id)
-        
-        await interaction.followup.send("✅ Live roster posted and linked. It will update automatically when players join.", ephemeral=True)
-
-    @app_commands.command(name="team_list_set_id", description="Link the bot to an existing team list message.")
-    @app_commands.describe(message_id="The ID of the message to update")
-    async def team_list_set_id(self, interaction: discord.Interaction, message_id: str):
-        if not self.has_event_staff_role(interaction.user):
-            await interaction.response.send_message("❌ Only Event Staff can use this.", ephemeral=True)
-            return
-            
-        await interaction.response.defer(ephemeral=True)
-            
-        try:
-            msg_id_int = int(message_id.strip())
-            msg = await interaction.channel.fetch_message(msg_id_int)
-            
-            self.save_team_list_config(interaction.channel_id, msg.id)
-            
-            capacities = await self.get_team_capacity_limits(interaction.guild)
-            embed = self.build_team_list_embed(interaction.guild, capacities)
-            await msg.edit(embed=embed)
-            
-            await interaction.followup.send("✅ Successfully linked and updated the team list message!", ephemeral=True)
-        except discord.NotFound:
-            await interaction.followup.send("❌ Message not found in this channel. You must run this command in the exact same channel as the target message.", ephemeral=True)
-        except ValueError:
-            await interaction.followup.send("❌ Invalid message ID format.", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
-
-    def load_team_list_config(self):
-        """Loads the saved team list message ID from a local file."""
-        import os
-        import json
-        try:
-            if os.path.exists("team_list_config.json"):
-                with open("team_list_config.json", "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            print(f"❌ Error loading team list config: {e}")
-        return {"channel_id": None, "message_id": None}
-
-    def save_team_list_config(self, channel_id: int, message_id: int):
-        """Saves the team list message ID so it survives bot resets."""
-        try:
-            with open(TEAM_LIST_CONFIG_FILE, "w") as f:
-                json.dump({"channel_id": channel_id, "message_id": message_id}, f)
-        except Exception as e:
-            print(f"❌ Error saving team list config: {e}")
-
-    def build_team_list_embed(self, guild: discord.Guild, capacities: dict) -> discord.Embed:
-        """Constructs the roster embed showing all teams."""
-        embed = discord.Embed(title="🏆 Official Team Roster", color=discord.Color.gold())
-        description = ""
-
-        for team_name in ACTIVE_TEAMS:
-            role = discord.utils.get(guild.roles, name=team_name)
-            cap_data = capacities.get(team_name, {"current": 0, "max": 19, "is_full": False})
-            
-            cap_status = " 🔴 (FULL)" if cap_data["is_full"] else ""
-            
-            if role:
-                actual_members = [m for m in guild.members if role in m.roles]
-                description += f"**{team_name} (Size: {len(actual_members)}/{cap_data['max']}){cap_status}**\n"
-                
-                if actual_members:
-                    captains_list = [m for m in actual_members if self.has_event_captain_role(m)]
-                    players_list = [m for m in actual_members if m not in captains_list]
-                    
-                    for cap in captains_list:
-                        description += f"👑 {cap.mention} • **Captain**\n"
-                    for player in players_list:
-                        description += f"👤 {player.mention}\n"
-                else:
-                    description += "*No members drafted yet.*\n"
-            else:
-                description += f"**{team_name} (Size: 0/{cap_data['max']})**\n*Role not found!*\n"
-                
-            description += "\n"
-                
-        embed.description = description
-        embed.set_footer(text="Roster updates automatically as players are drafted!")
-        return embed
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MonopolyCog(bot))
