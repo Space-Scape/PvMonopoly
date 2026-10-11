@@ -2456,12 +2456,19 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send(content=f"❌ Could not find data for **{team_name}**.", ephemeral=True)
             return
 
-        tracker = self.team_scavenges_per_tile.get(team_name, {"tile": -1, "bosses": []})
+        team_record = next((r for r in records if r.get("Team") == team_name), None)
+        completed_bosses = []
         
-        if isinstance(tracker, int):
-            tracker = {"tile": tracker, "bosses": []}
-            
-        completed_bosses = tracker["bosses"] if tracker.get("tile") == current_tile else []
+        if team_record:
+            if str(team_record.get("Scavenged Vorkath", "")).strip().lower() in ["yes", "true", "1"]:
+                completed_bosses.append("Vorkath")
+            if str(team_record.get("Scavenged DKS", "")).strip().lower() in ["yes", "true", "1"]:
+                completed_bosses.append("Dagannoth Kings")
+            if str(team_record.get("Scavenged Sarachnis", "")).strip().lower() in ["yes", "true", "1"]:
+                completed_bosses.append("Sarachnis")
+            if str(team_record.get("Scavenged Titans", "")).strip().lower() in ["yes", "true", "1"]:
+                completed_bosses.append("Royal Titans")
+                
         available_bosses = [b for b in SCAVENGER_BOSSES if b not in completed_bosses]
         
         if not available_bosses:
