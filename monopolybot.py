@@ -1126,14 +1126,11 @@ class MonopolyCog(commands.Cog):
                             if has_all_4:
                                 await asyncio.to_thread(self.cog.increment_rolls_available, team_name)
                                 
-                                await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, vork_idx, "")
-                                await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, dks_idx, "")
-                                await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, sara_idx, "")
-                                await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, titan_idx, "")
+                                await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, target_col_idx, "Yes")
 
                                 if "Scavenge Progress" in headers:
                                     prog_col_idx = headers.index("Scavenge Progress") + 1
-                                    await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, prog_col_idx, 0)
+                                    await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, prog_col_idx, 4)
                                 
                                 tax_msg = ""
                                 house_records = await asyncio.to_thread(self.cog.house_data_sheet.get_all_records)
@@ -1159,7 +1156,7 @@ class MonopolyCog(commands.Cog):
                                     await asyncio.to_thread(self.cog.house_data_sheet.update_cell, any_other_house[0], house_count_col, new_count)
                                     tax_msg = "🏠 **Skip Tax:** Since you didn't have a house on this tile, the Bank **repossessed 1 house** from another property you own!"
                                 else:
-                                    tax_msg = "🏠 **Skip Tax:** You own zero houses, so the Bank couldn't repossess anything! (However, you permanently forfeit the right to build on this skipped tile)."
+                                    tax_msg = "🏠 **Skip Tax:** You own zero houses, so the Bank couldn't repossess anything! (However, you forfeit the right to build on this tile for your current turn)."
 
                                 bingo_embed = discord.Embed(
                                     title="🔥 SCAVENGER BINGO COMPLETED! 🔥",
@@ -2261,6 +2258,15 @@ class MonopolyCog(commands.Cog):
 
             current_pos = int(team_info.get("Position", -1))
             current_gp = int(str(team_info.get("GP", 0)).replace(",", ""))
+
+            vork_done = str(team_info.get("Scavenged Vorkath", "")).strip().lower() in ["yes", "true", "1"]
+            dks_done = str(team_info.get("Scavenged DKS", "")).strip().lower() in ["yes", "true", "1"]
+            sara_done = str(team_info.get("Scavenged Sarachnis", "")).strip().lower() in ["yes", "true", "1"]
+            titan_done = str(team_info.get("Scavenged Titans", "")).strip().lower() in ["yes", "true", "1"]
+            
+            if vork_done and dks_done and sara_done and titan_done:
+                await interaction.followup.send("❌ **Action Denied:** You completed a Scavenger Bingo on this tile and triggered the Skip Tax. You forfeit the right to build here for the remainder of this turn!", ephemeral=True)
+                return
             
             # 3. HOUSE
             prop_index = -1
