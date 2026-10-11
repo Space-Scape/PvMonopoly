@@ -60,7 +60,7 @@ CARD_EMOJIS = {
     "Escape Crystal": "<:dragonstone:1437979925863862363>", 
     "Pickpocket": "<:thieving:1437980167791448237>",
     "Low Alchemy": "<:gold:1406230459301630043>",
-    "High Alchemy": "<:MaxCash:1347684049040183427>",
+    "High Alchemy": "<:MaxCash:1558959942394847372>",
     "Vengeance": "<:venge:1438084953559797884>",
     "Redemption": "<:redemption:1437979567900987493>",
     "Elder Maul": "<:maul:1437979898865258668>",
@@ -1030,12 +1030,12 @@ class MonopolyCog(commands.Cog):
                                     
                                     if is_scavenger:
                                         gp_message = (
-                                            f"<:MaxCash:1347684049040183427> **Scavenger Loot!** **{team_name}** rolled the GP prize and earned **{final_gp_value:,} GP** "
+                                            f"<:MaxCash:1558959942394847372> **Scavenger Loot!** **{team_name}** rolled the GP prize and earned **{final_gp_value:,} GP** "
                                             f"from their off-board **{self.drop}** drop!{alchemy_bonus}"
                                         )
                                     else:
                                         gp_message = (
-                                            f"<:MaxCash:1347684049040183427> **{team_name}** earned **{final_gp_value:,} GP** "
+                                            f"<:MaxCash:1558959942394847372> **{team_name}** earned **{final_gp_value:,} GP** "
                                             f"from a **{self.drop}** drop!{alchemy_bonus}"
                                         )
 
@@ -2143,7 +2143,7 @@ class MonopolyCog(commands.Cog):
                 await interaction.followup.send(f"❌ Could not find data for **{team_name}**.", ephemeral=True)
                 return
             embed = discord.Embed(
-                title=f"<:MaxCash:1347684049040183427> {team_name} Team Status",
+                title=f"<:MaxCash:1558959942394847372> {team_name} Team Status",
                 color=discord.Color.gold()
             )
             embed.add_field(
@@ -2210,7 +2210,7 @@ class MonopolyCog(commands.Cog):
             )
             
             if gp_output:
-                embed.add_field(name="<:MaxCash:1347684049040183427> GP Holdings", value=gp_output, inline=True)
+                embed.add_field(name="<:MaxCash:1558959942394847372> GP Holdings", value=gp_output, inline=True)
                 
             if passes_output:
                 embed.add_field(name="🚶 Go Passes", value=passes_output, inline=True)
