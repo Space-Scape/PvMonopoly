@@ -19,12 +19,12 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    if "monopoly" not in bot.extensions:
+    if "monopolybot" not in bot.extensions:
         try:
-            await bot.load_extension("monopoly")
-            print("✅ Loaded extension: monopoly")
+            await bot.load_extension("monopolybot")
+            print("✅ Loaded extension: monopolybot")
         except Exception as e:
-            print(f"❌ Failed to load extension: monopoly - {e}")
+            print(f"❌ Failed to load extension: monopolybot - {e}")
             traceback.print_exc()
     try:
         synced = await tree.sync()
