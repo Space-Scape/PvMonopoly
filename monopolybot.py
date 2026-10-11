@@ -1130,6 +1130,10 @@ class MonopolyCog(commands.Cog):
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, dks_idx, "")
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, sara_idx, "")
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, titan_idx, "")
+
+                                if "Scavenge Progress" in headers:
+                                    prog_col_idx = headers.index("Scavenge Progress") + 1
+                                    await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, prog_col_idx, 0)
                                 
                                 tax_msg = ""
                                 house_records = await asyncio.to_thread(self.cog.house_data_sheet.get_all_records)
@@ -1172,8 +1176,13 @@ class MonopolyCog(commands.Cog):
                             
                             else:
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, target_col_idx, "Yes")
-                                
+
                                 boss_count = sum([vork_done, dks_done, sara_done, titan_done])
+                                
+                                if "Scavenge Progress" in headers:
+                                    prog_col_idx = headers.index("Scavenge Progress") + 1
+                                    await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, prog_col_idx, boss_count)
+                                
                                 if team_chan:
                                     await team_chan.send(f"💀 **Scavenger Drop Approved!**\nYour team has completed **{boss_count}/4** Scavenger bosses for this tile. (**{self.boss}** marked as complete!)")
 
