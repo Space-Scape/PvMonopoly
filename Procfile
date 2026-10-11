@@ -1,1 +1,1 @@
-web: python monopolybot.py
+web: python eventwizard.py
