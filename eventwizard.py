@@ -27,7 +27,7 @@ async def on_ready():
             print(f"❌ Failed to load extension: monopolybot - {e}")
             traceback.print_exc()
     try:
-        synced = await tree.sync()
+        synced = await await bot.tree.sync()
         print(f"✅ Synced {len(synced)} slash commands.")
     except Exception as e:
         print(f"❌ Command sync failed: {e}")
