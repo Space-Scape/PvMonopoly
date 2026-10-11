@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import collections
 import traceback
 
+intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
