@@ -238,7 +238,7 @@ class MonopolyCog(commands.Cog):
                 if config_records:
                     row = config_records[0]
                     global REVIEW_CHANNEL, LOG_CHANNEL, GAME_LOG_CHANNEL_ID, EVENT_STAFF_ROLE_ID, EVENT_CAPTAIN_ROLE_ID, BINGO_PLAYER_ROLE_ID
-                    global TEAM_ROLES, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
+                    global TEAM_ROLES, TEAM_CHANNELS_MAP, TEAM_CHANNEL_IDS_AS_STR
 
                     REVIEW_CHANNEL = str(row.get("REVIEW_CHANNEL", REVIEW_CHANNEL))
                     LOG_CHANNEL = str(row.get("LOG_CHANNEL", LOG_CHANNEL))
