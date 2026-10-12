@@ -1418,6 +1418,92 @@ class MonopolyCog(commands.Cog):
         except Exception as e:
             print(f"Error setting teleblock status for {team_name}: {e}")
 
+    @app_commands.command(name="add_team", description="[Staff] Dynamically add a new team to the game.")
+    @app_commands.describe(
+        role="The Discord role for the team", 
+        channel="The private text channel for the team", 
+        color_hex="Hex color code for logs (e.g. 0x00BCD4 or #00BCD4)"
+    )
+    async def add_team(self, interaction: discord.Interaction, role: discord.Role, channel: discord.TextChannel, color_hex: str = "0x5865F2"):
+        if not self.has_event_staff_role(interaction.user) and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
+            return
+            
+        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
+        
+        team_name = role.name
+        
+        try:
+            color_int = int(color_hex.replace("#", "").replace("0x", ""), 16)
+        except ValueError:
+            color_int = 0x5865F2
+            
+        if team_name not in TEAM_ROLES:
+            TEAM_ROLES.append(team_name)
+        if team_name not in ACTIVE_TEAMS:
+            ACTIVE_TEAMS.append(team_name)
+            
+        TEAM_CHANNELS_MAP[team_name] = channel.id
+        GAME_LOG_TEAM_COLOR_MAP[team_name] = color_int
+        TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
+        
+        try:
+            with open(TEAM_LIST_CONFIG_FILE, "w") as f:
+                json.dump({
+                    "TEAM_ROLES": TEAM_ROLES,
+                    "ACTIVE_TEAMS": ACTIVE_TEAMS,
+                    "TEAM_CHANNELS_MAP": TEAM_CHANNELS_MAP,
+                    "GAME_LOG_TEAM_COLOR_MAP": GAME_LOG_TEAM_COLOR_MAP
+                }, f, indent=4)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Added to live memory, but failed to save to file: {e}", ephemeral=True)
+            return
+            
+        await interaction.response.send_message(
+            f"✅ Successfully added **{team_name}** to the game!\n"
+            f"📍 **Channel:** {channel.mention}\n"
+            f"⚠️ *Important: Don't forget to manually add a row for '{team_name}' in the `TeamData` Google Sheet!*", 
+            ephemeral=True
+        )
+
+    @app_commands.command(name="remove_team", description="[Staff] Dynamically remove a team from the game.")
+    @app_commands.describe(role="The Discord role of the team to remove")
+    async def remove_team(self, interaction: discord.Interaction, role: discord.Role):
+        if not self.has_event_staff_role(interaction.user) and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
+            return
+            
+        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
+        
+        team_name = role.name
+        
+        if team_name not in TEAM_ROLES and team_name not in ACTIVE_TEAMS:
+            await interaction.response.send_message(f"❌ **{team_name}** is not an active team.", ephemeral=True)
+            return
+            
+        if team_name in TEAM_ROLES:
+            TEAM_ROLES.remove(team_name)
+        if team_name in ACTIVE_TEAMS:
+            ACTIVE_TEAMS.remove(team_name)
+            
+        TEAM_CHANNELS_MAP.pop(team_name, None)
+        GAME_LOG_TEAM_COLOR_MAP.pop(team_name, None)
+        TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
+        
+        try:
+            with open(TEAM_LIST_CONFIG_FILE, "w") as f:
+                json.dump({
+                    "TEAM_ROLES": TEAM_ROLES,
+                    "ACTIVE_TEAMS": ACTIVE_TEAMS,
+                    "TEAM_CHANNELS_MAP": TEAM_CHANNELS_MAP,
+                    "GAME_LOG_TEAM_COLOR_MAP": GAME_LOG_TEAM_COLOR_MAP
+                }, f, indent=4)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Removed from live memory, but failed to save to file: {e}", ephemeral=True)
+            return
+            
+        await interaction.response.send_message(f"🗑️ Successfully removed **{team_name}** from the game. (You can also delete their row from the `TeamData` sheet).", ephemeral=True)
+        
     @app_commands.command(name="select_roles", description="[Staff] Update the roles used for Event Staff, Captains, or Bingo Players.")
     @app_commands.describe(
         target="The specific role category you want to update",
