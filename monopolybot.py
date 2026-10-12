@@ -1518,7 +1518,40 @@ class MonopolyCog(commands.Cog):
             return
             
         await interaction.response.send_message(f"🗑️ Successfully removed **{team_name}** from the game.", ephemeral=True)
+
+    @app_commands.command(name="toggle_active", description="[Staff] Toggle a registered team between Active and Inactive.")
+    @app_commands.describe(role="The Discord role of the team to toggle")
+    async def toggle_active(self, interaction: discord.Interaction, role: discord.Role):
+        if not self.has_event_staff_role(interaction.user) and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
+            return
+            
+        global TEAM_ROLES, ACTIVE_TEAMS, CONFIG
         
+        team_name = role.name
+        
+        if team_name not in TEAM_ROLES:
+            await interaction.response.send_message(f"❌ **{team_name}** is not a registered team. Use `/add_team` first.", ephemeral=True)
+            return
+
+        if team_name in ACTIVE_TEAMS:
+            ACTIVE_TEAMS.remove(team_name)
+            status_msg = f"⏸️ **{team_name}** is now **INACTIVE**. They will not be included in active gameplay."
+        else:
+            ACTIVE_TEAMS.append(team_name)
+            status_msg = f"▶️ **{team_name}** is now **ACTIVE** and ready to play."
+            
+        CONFIG["ACTIVE_TEAMS"] = ACTIVE_TEAMS
+        
+        try:
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(CONFIG, f, indent=4)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Status updated in memory, but failed to save to file: {e}", ephemeral=True)
+            return
+            
+        await interaction.response.send_message(status_msg, ephemeral=True)
+            
     @app_commands.command(name="select_roles", description="[Staff] Update the roles used for Event Staff, Captains, or Bingo Players.")
     @app_commands.describe(
         target="The specific role category you want to update",
