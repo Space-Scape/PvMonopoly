@@ -1613,6 +1613,13 @@ class MonopolyCog(commands.Cog):
         
         for team_name in TEAM_ROLES:
             team_chan = self.get_team_channel(team_name)
+            if team_chan:
+                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** <a:fire:1559013496455168082> \n\nHere are your 3 starting cards:")
+                for _ in range(3):
+                    card_type = random.choice(["Chest", "Chance"])
+                    await self.team_receives_card(team_name, card_type, team_chan)
+                    
+        await interaction.followup.send("Game started! 3 random cards have been dealt to all teams.")
     
     @app_commands.command(name="signup", description="Submit your signup with RSN and a screenshot")
     @app_commands.describe(rsn="Your RSN (RuneScape name)", screenshot="Upload a screenshot for your signup")
@@ -2238,6 +2245,15 @@ class MonopolyCog(commands.Cog):
                 color=discord.Color.orange()
             )
             embed2.add_field(
+                name="🗺️ Special Board Tiles",
+                value=(
+                    "**GO:** Passing GO grants **20M GP** and **3 Cards**. Landing directly ON GO grants a **Free Roll**!\n"
+                    "**Gliders:** Landing on a Glider tile automatically charges an **8M GP** fee and flies your team to the next Glider. If you can't afford it, you stay put and get a Free Roll.\n"
+                    "**Jail:** Landing on Tile 30 immediately sends your team to Jail!"
+                ),
+                inline=False
+            )
+            embed2.add_field(
                 name="🏠 Houses & Taxes",
                 value="When you land on a boss tile, your Captain can buy a house (up to 4 per tile). If another team lands on your property and gets a drop, they pay you a massive percentage of their earnings as tax!",
                 inline=False
@@ -2250,6 +2266,11 @@ class MonopolyCog(commands.Cog):
             embed2.add_field(
                 name="💎 Rare Drop Table (Passives)",
                 value="Every approved drop has a chance to roll on the Rare Drop Table. You can win powerful passive items (like a Ring of Recoil or Protect Item) that automatically defend your team from attacks or taxes. You can only hold **ONE** passive at a time!",
+                inline=False
+            )
+            embed2.add_field(
+                name="🗡️ Scavenging (Off-Board Bosses)",
+                value="Don't want to hunt the boss on your current tile? Use `/scavenge` to hunt off-board bosses (Vorkath, DKS, Sarachnis, Giant Mole) instead! Completing all 4 grants a **Free Roll**, but triggers the Bank's **Skip Tax**, which destroys or repossesses one of your houses!",
                 inline=False
             )
             embed2.add_field(
@@ -2273,12 +2294,14 @@ class MonopolyCog(commands.Cog):
             embed3.add_field(
                 name="For Everyone on the Team!",
                 value=(
+                    "**/signup:** Submits your RSN and screenshot to officially register for the event.\n"
                     "**/roll:** Uses one of your team's rolls to move.\n"
                     "**/stats:** View your team's passes, GP, houses, and leaderboard position.\n"
                     "**/gp:** Curious about your GP? Use this to check the team's total.\n"
                     "**/cards:** See all the cards your team is currently holding. *Visible only to you.*\n"
                     "**/show_drops:** Shows every drop available for the tile you're on.\n"
-                    "**/submitdrop:** Use this to submit a boss drop for a roll."
+                    "**/submitdrop:** Use this to submit a boss drop for a roll.\n"
+                    "**/scavenge:** Forfeit your main board tile to submit an off-board scavenger boss drop."
                 ),
                 inline=False
             )
