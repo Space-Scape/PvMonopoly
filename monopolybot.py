@@ -19,51 +19,27 @@ from discord import SelectOption, Attachment
 from discord import ui, Interaction, SelectOption, TextStyle, Attachment, Member
 
 # ========== CONFIG ==========
-CONFIG_FILE = "bot_config.json"
+SPREADSHEET_ID = "1OVC8HImUpoh2keU-h2v_b2gFDa4zyfWsaJxBWRoSJ08"
+SIGNUP_SPREADSHEET_ID = "1c7TzXlyn8KinCKNJadIBfY_6PcXF-9icbfC_E8NAGqI"
 
-CONFIG = {
-    "SPREADSHEET_ID": "1OVC8HImUpoh2keU-h2v_b2gFDa4zyfWsaJxBWRoSJ08",
-    "SIGNUP_SPREADSHEET_ID": "1c7TzXlyn8KinCKNJadIBfY_6PcXF-9icbfC_E8NAGqI",
-    "REVIEW_CHANNEL": 1558574050740281466,
-    "LOG_CHANNEL": 1558574472787791972,
-    "GAME_LOG_CHANNEL_ID": 1558574136127787049,
-    "EVENT_STAFF_ROLE_ID": 1558581672268537856,
-    "EVENT_CAPTAIN_ROLE_ID": 1558581790946500628,
-    "BINGO_PLAYER_ROLE_ID": 1558581910211526756,
-    "TEAM_ROLES": ["Team 1", "Team 2", "Team 3"],
-    "ACTIVE_TEAMS": ["Team 1", "Team 2", "Team 3"],
-    "TEAM_CHANNELS_MAP": {},
-    "GAME_LOG_TEAM_COLOR_MAP": {
-        "Team 1": 0x00BCD4,
-        "Team 2": 0x9B59B6,
-        "Team 3": 0xE74C3C,
-        "Team 4": 0x2ECC71,
-        "Team 5": 0x00BCD4,
-        "Team 6": 0xC4A484,
-        "Team 7": 0x3498DB,
-    }
+REVIEW_CHANNEL = "1558574050740281466"
+LOG_CHANNEL = "1558574472787791972"
+GAME_LOG_CHANNEL_ID = 1558574136127787049
+EVENT_STAFF_ROLE_ID = 1558581672268537856
+EVENT_CAPTAIN_ROLE_ID = 1558581790946500628
+BINGO_PLAYER_ROLE_ID = 1558581910211526756
+
+TEAM_ROLES = ["Team 1", "Team 2", "Team 3"]
+TEAM_CHANNELS_MAP = {}
+GAME_LOG_TEAM_COLOR_MAP = {
+    "Team 1": 0x00BCD4,
+    "Team 2": 0x9B59B6,
+    "Team 3": 0xE74C3C,
+    "Team 4": 0x2ECC71,
+    "Team 5": 0x00BCD4,
+    "Team 6": 0xC4A484,
+    "Team 7": 0x3498DB,
 }
-
-if os.path.exists(CONFIG_FILE):
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            loaded_config = json.load(f)
-            CONFIG.update(loaded_config)
-    except json.JSONDecodeError:
-        print(f"⚠️ Warning: {CONFIG_FILE} is empty or corrupted. Using defaults.")
-
-SPREADSHEET_ID = CONFIG["SPREADSHEET_ID"]
-SIGNUP_SPREADSHEET_ID = CONFIG["SIGNUP_SPREADSHEET_ID"]
-REVIEW_CHANNEL = str(CONFIG["REVIEW_CHANNEL"])
-LOG_CHANNEL = str(CONFIG["LOG_CHANNEL"])
-GAME_LOG_CHANNEL_ID = int(CONFIG["GAME_LOG_CHANNEL_ID"])
-EVENT_STAFF_ROLE_ID = int(CONFIG["EVENT_STAFF_ROLE_ID"])
-EVENT_CAPTAIN_ROLE_ID = int(CONFIG["EVENT_CAPTAIN_ROLE_ID"])
-BINGO_PLAYER_ROLE_ID = int(CONFIG["BINGO_PLAYER_ROLE_ID"])
-TEAM_ROLES = CONFIG["TEAM_ROLES"]
-ACTIVE_TEAMS = CONFIG["ACTIVE_TEAMS"]
-TEAM_CHANNELS_MAP = CONFIG["TEAM_CHANNELS_MAP"]
-GAME_LOG_TEAM_COLOR_MAP = CONFIG["GAME_LOG_TEAM_COLOR_MAP"]
 
 TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
 
@@ -226,6 +202,23 @@ class MonopolyCog(commands.Cog):
             print("... loaded Command Log")
             self.team_data_sheet = sheet.worksheet("TeamData")
             print("... loaded TeamData")
+
+            try:
+                team_records = self.team_data_sheet.get_all_records()
+                global GAME_LOG_TEAM_COLOR_MAP
+                GAME_LOG_TEAM_COLOR_MAP.clear()
+                for r in team_records:
+                    t_name = str(r.get("Team", "")).strip()
+                    if t_name:
+                        color_str = str(r.get("Bg Color Hex", r.get("BG Color", "0x5865F2"))).strip().replace("#", "").replace("0x", "")
+                        try:
+                            GAME_LOG_TEAM_COLOR_MAP[t_name] = int(color_str, 16)
+                        except ValueError:
+                            GAME_LOG_TEAM_COLOR_MAP[t_name] = 0x5865F2
+                print("✅ Dynamic team colors loaded from TeamData.")
+            except Exception as e:
+                print(f"⚠️ Could not load team colors from TeamData: {e}")
+
             self.chest_sheet = sheet.worksheet("ChestCards")
             print("... loaded ChestCards")
             self.chance_sheet = sheet.worksheet("ChanceCards")
@@ -237,9 +230,39 @@ class MonopolyCog(commands.Cog):
             self.house_data_sheet = sheet.worksheet("HouseData")
             print("... loaded HouseData")
             
+            try:
+                self.config_sheet = sheet.worksheet("Config")
+                print("... loaded Config")
+                config_records = self.config_sheet.get_all_records()
+                
+                if config_records:
+                    row = config_records[0]
+                    global REVIEW_CHANNEL, LOG_CHANNEL, GAME_LOG_CHANNEL_ID, EVENT_STAFF_ROLE_ID, EVENT_CAPTAIN_ROLE_ID, BINGO_PLAYER_ROLE_ID
+                    global TEAM_ROLES, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
+
+                    REVIEW_CHANNEL = str(row.get("REVIEW_CHANNEL", REVIEW_CHANNEL))
+                    LOG_CHANNEL = str(row.get("LOG_CHANNEL", LOG_CHANNEL))
+                    GAME_LOG_CHANNEL_ID = int(row.get("GAME_LOG_CHANNEL_ID", GAME_LOG_CHANNEL_ID))
+                    EVENT_STAFF_ROLE_ID = int(row.get("EVENT_STAFF_ROLE_ID", EVENT_STAFF_ROLE_ID))
+                    EVENT_CAPTAIN_ROLE_ID = int(row.get("EVENT_CAPTAIN_ROLE_ID", EVENT_CAPTAIN_ROLE_ID))
+                    BINGO_PLAYER_ROLE_ID = int(row.get("BINGO_PLAYER_ROLE_ID", BINGO_PLAYER_ROLE_ID))
+                    
+                    if row.get("TEAM_ROLES"):
+                        try: TEAM_ROLES = json.loads(str(row["TEAM_ROLES"]))
+                        except: pass
+                    
+                    if row.get("TEAM_CHANNELS_MAP"):
+                        try: TEAM_CHANNELS_MAP = json.loads(str(row["TEAM_CHANNELS_MAP"]))
+                        except: pass
+                    
+                    TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
+                    print("✅ Config loaded from Google Sheets.")
+            except Exception as config_err:
+                print(f"⚠️ Could not load config from Google Sheets: {config_err}")
+            
             print("✅ Monopoly Cog: Google Sheets initialized.")
 
-            # Signup spreadsheet is optional
+            # Signup spreadsheet optional
             try:
                 self.signup_sheet_book = sheet_client.open_by_key(SIGNUP_SPREADSHEET_ID)
                 try:
@@ -279,6 +302,32 @@ class MonopolyCog(commands.Cog):
         except Exception as e:
             print(f"❌ Error logging command: {e}")
 
+    def save_config_to_sheet(self):
+        """Saves current global configuration state to the Config worksheet."""
+        try:
+            headers = self.config_sheet.row_values(1)
+            updates = []
+            data_dict = {
+                "REVIEW_CHANNEL": str(REVIEW_CHANNEL),
+                "LOG_CHANNEL": str(LOG_CHANNEL),
+                "GAME_LOG_CHANNEL_ID": str(GAME_LOG_CHANNEL_ID),
+                "EVENT_STAFF_ROLE_ID": str(EVENT_STAFF_ROLE_ID),
+                "EVENT_CAPTAIN_ROLE_ID": str(EVENT_CAPTAIN_ROLE_ID),
+                "BINGO_PLAYER_ROLE_ID": str(BINGO_PLAYER_ROLE_ID),
+                "TEAM_ROLES": json.dumps(TEAM_ROLES),
+                "TEAM_CHANNELS_MAP": json.dumps(TEAM_CHANNELS_MAP)
+            }
+            
+            for i, header in enumerate(headers):
+                if header in data_dict:
+                    updates.append({'range': gspread.utils.rowcol_to_a1(2, i+1), 'values': [[data_dict[header]]]})
+            
+            if updates:
+                self.config_sheet.batch_update(updates)
+                print("✅ Config saved to Google Sheets.")
+        except Exception as e:
+            print(f"❌ Failed to save config to sheet: {e}")
+    
     def get_team_data(self, team_role_name: str) -> dict:
         """Fetches all data for a specific team."""
         try:
@@ -1436,18 +1485,13 @@ class MonopolyCog(commands.Cog):
             print(f"Error setting teleblock status for {team_name}: {e}")
 
     @app_commands.command(name="add_team", description="[Staff] Dynamically add a new team to the game.")
-    @app_commands.describe(
-        role="The Discord role for the team", 
-        channel="The private text channel for the team", 
-        color_hex="Hex color code for logs (e.g. 0x00BCD4 or #00BCD4)"
-    )
+    @app_commands.describe(role="The Discord role for the team", channel="The private text channel for the team", color_hex="Hex color code for logs (e.g. 0x00BCD4 or #00BCD4)")
     async def add_team(self, interaction: discord.Interaction, role: discord.Role, channel: discord.TextChannel, color_hex: str = "0x5865F2"):
         if not self.has_event_staff_role(interaction.user) and not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
             return
             
-        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR, CONFIG
-        
+        global TEAM_ROLES, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
         team_name = role.name
         
         try:
@@ -1457,32 +1501,18 @@ class MonopolyCog(commands.Cog):
             
         if team_name not in TEAM_ROLES:
             TEAM_ROLES.append(team_name)
-        if team_name not in ACTIVE_TEAMS:
-            ACTIVE_TEAMS.append(team_name)
             
         TEAM_CHANNELS_MAP[team_name] = channel.id
         GAME_LOG_TEAM_COLOR_MAP[team_name] = color_int
         TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
         
-        # --- NEW UNIFIED SAVE LOGIC ---
-        CONFIG["TEAM_ROLES"] = TEAM_ROLES
-        CONFIG["ACTIVE_TEAMS"] = ACTIVE_TEAMS
-        CONFIG["TEAM_CHANNELS_MAP"] = TEAM_CHANNELS_MAP
-        CONFIG["GAME_LOG_TEAM_COLOR_MAP"] = GAME_LOG_TEAM_COLOR_MAP
-        
         try:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(CONFIG, f, indent=4)
+            await asyncio.to_thread(self.save_config_to_sheet)
         except Exception as e:
-            await interaction.response.send_message(f"❌ Added to live memory, but failed to save to file: {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ Added to live memory, but failed to save to sheet: {e}", ephemeral=True)
             return
             
-        await interaction.response.send_message(
-            f"✅ Successfully added **{team_name}** to the game!\n"
-            f"📍 **Channel:** {channel.mention}\n"
-            f"⚠️ *Important: Don't forget to manually add a row for '{team_name}' in the `TeamData` Google Sheet!*", 
-            ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ Successfully added **{team_name}** to the game!\n📍 **Channel:** {channel.mention}\n⚠️ *Important: Don't forget to manually add a row for '{team_name}' in the `TeamData` Google Sheet!*", ephemeral=True)
 
     @app_commands.command(name="remove_team", description="[Staff] Dynamically remove a team from the game.")
     @app_commands.describe(role="The Discord role of the team to remove")
@@ -1491,75 +1521,28 @@ class MonopolyCog(commands.Cog):
             await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
             return
             
-        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR, CONFIG
-        
+        global TEAM_ROLES, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
         team_name = role.name
         
-        if team_name not in TEAM_ROLES and team_name not in ACTIVE_TEAMS:
-            await interaction.response.send_message(f"❌ **{team_name}** is not an active team.", ephemeral=True)
+        if team_name not in TEAM_ROLES:
+            await interaction.response.send_message(f"❌ **{team_name}** is not a registered team.", ephemeral=True)
             return
             
-        if team_name in TEAM_ROLES:
-            TEAM_ROLES.remove(team_name)
-        if team_name in ACTIVE_TEAMS:
-            ACTIVE_TEAMS.remove(team_name)
-            
+        TEAM_ROLES.remove(team_name)
         TEAM_CHANNELS_MAP.pop(team_name, None)
         GAME_LOG_TEAM_COLOR_MAP.pop(team_name, None)
         TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
         
-        CONFIG["TEAM_ROLES"] = TEAM_ROLES
-        CONFIG["ACTIVE_TEAMS"] = ACTIVE_TEAMS
-        CONFIG["TEAM_CHANNELS_MAP"] = TEAM_CHANNELS_MAP
-        CONFIG["GAME_LOG_TEAM_COLOR_MAP"] = GAME_LOG_TEAM_COLOR_MAP
-        
         try:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(CONFIG, f, indent=4)
+            await asyncio.to_thread(self.save_config_to_sheet)
         except Exception as e:
-            await interaction.response.send_message(f"❌ Removed from live memory, but failed to save to file: {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ Removed from live memory, but failed to save to sheet: {e}", ephemeral=True)
             return
             
         await interaction.response.send_message(f"🗑️ Successfully removed **{team_name}** from the game.", ephemeral=True)
 
-    @app_commands.command(name="toggle_active", description="[Staff] Toggle a registered team between Active and Inactive.")
-    @app_commands.describe(role="The Discord role of the team to toggle")
-    async def toggle_active(self, interaction: discord.Interaction, role: discord.Role):
-        if not self.has_event_staff_role(interaction.user) and not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
-            return
-            
-        global TEAM_ROLES, ACTIVE_TEAMS, CONFIG
-        
-        team_name = role.name
-        
-        if team_name not in TEAM_ROLES:
-            await interaction.response.send_message(f"❌ **{team_name}** is not a registered team. Use `/add_team` first.", ephemeral=True)
-            return
-
-        if team_name in ACTIVE_TEAMS:
-            ACTIVE_TEAMS.remove(team_name)
-            status_msg = f"⏸️ **{team_name}** is now **INACTIVE**. They will not be included in active gameplay."
-        else:
-            ACTIVE_TEAMS.append(team_name)
-            status_msg = f"▶️ **{team_name}** is now **ACTIVE** and ready to play."
-            
-        CONFIG["ACTIVE_TEAMS"] = ACTIVE_TEAMS
-        
-        try:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(CONFIG, f, indent=4)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Status updated in memory, but failed to save to file: {e}", ephemeral=True)
-            return
-            
-        await interaction.response.send_message(status_msg, ephemeral=True)
-            
     @app_commands.command(name="select_roles", description="[Staff] Update the roles used for Event Staff, Captains, or Bingo Players.")
-    @app_commands.describe(
-        target="The specific role category you want to update",
-        role="Select the new role from the server list"
-    )
+    @app_commands.describe(target="The specific role category you want to update", role="Select the new role from the server list")
     @app_commands.choices(target=[
         app_commands.Choice(name="Staff", value="event_staff"),
         app_commands.Choice(name="Captain", value="event_captain"),
@@ -1571,26 +1554,26 @@ class MonopolyCog(commands.Cog):
             return
 
         global EVENT_STAFF_ROLE_ID, EVENT_CAPTAIN_ROLE_ID, BINGO_PLAYER_ROLE_ID
-        
         target_value = target.value
         
         if target_value == "event_staff":
             EVENT_STAFF_ROLE_ID = role.id
-            await interaction.response.send_message(f"✅ **Event Staff** role routing successfully updated to {role.mention}.", ephemeral=True)
-            
+            msg = f"✅ **Event Staff** role routing successfully updated to {role.mention}."
         elif target_value == "event_captain":
             EVENT_CAPTAIN_ROLE_ID = role.id
-            await interaction.response.send_message(f"✅ **Event Captain** role routing successfully updated to {role.mention}.", ephemeral=True)
-            
+            msg = f"✅ **Event Captain** role routing successfully updated to {role.mention}."
         elif target_value == "bingo_player":
             BINGO_PLAYER_ROLE_ID = role.id
-            await interaction.response.send_message(f"✅ **Bingo Player** role routing successfully updated to {role.mention}.", ephemeral=True)
+            msg = f"✅ **Bingo Player** role routing successfully updated to {role.mention}."
+            
+        try:
+            await asyncio.to_thread(self.save_config_to_sheet)
+            await interaction.response.send_message(msg, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Updated in memory, but failed to save to sheet: {e}", ephemeral=True)
     
     @app_commands.command(name="select_channels", description="[Staff] Update the channel used for game logs, drop logs, or reviews.")
-    @app_commands.describe(
-        target="The specific log you want to assign a new channel to",
-        channel="Select the new channel from the server list"
-    )
+    @app_commands.describe(target="The specific log you want to assign a new channel to", channel="Select the new channel from the server list")
     @app_commands.choices(target=[
         app_commands.Choice(name="Game Log", value="game_log"),
         app_commands.Choice(name="Review Channel", value="review_channel"),
@@ -1602,20 +1585,23 @@ class MonopolyCog(commands.Cog):
             return
 
         global REVIEW_CHANNEL, LOG_CHANNEL, GAME_LOG_CHANNEL_ID
-        
         target_value = target.value
         
         if target_value == "game_log":
             GAME_LOG_CHANNEL_ID = channel.id
-            await interaction.response.send_message(f"✅ **Game Log** updated to {channel.mention}.", ephemeral=True)
-            
+            msg = f"✅ **Game Log** updated to {channel.mention}."
         elif target_value == "review_channel":
             REVIEW_CHANNEL = str(channel.id)
-            await interaction.response.send_message(f"✅ **Review Channel** updated to {channel.mention}.", ephemeral=True)
-            
+            msg = f"✅ **Review Channel** updated to {channel.mention}."
         elif target_value == "drop_log":
             LOG_CHANNEL = str(channel.id)
-            await interaction.response.send_message(f"✅ **Drop Log** updated to {channel.mention}.", ephemeral=True)
+            msg = f"✅ **Drop Log** updated to {channel.mention}."
+            
+        try:
+            await asyncio.to_thread(self.save_config_to_sheet)
+            await interaction.response.send_message(msg, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Updated in memory, but failed to save to sheet: {e}", ephemeral=True)
             
     @app_commands.command(name="start_game", description="[Staff] Start the game and deal 3 random cards to all active teams.")
     async def start_game(self, interaction: discord.Interaction):
@@ -1625,13 +1611,8 @@ class MonopolyCog(commands.Cog):
 
         await interaction.response.defer(ephemeral=False)
         
-        for team_name in ACTIVE_TEAMS:
+        for team_name in TEAM_ROLES:
             team_chan = self.get_team_channel(team_name)
-            if team_chan:
-                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** <a:fire:1559013496455168082> \n\nHere are your 3 starting cards:")
-                for _ in range(3):
-                    card_type = random.choice(["Chest", "Chance"])
-                    await self.team_receives_card(team_name, card_type, team_chan)
     
     @app_commands.command(name="signup", description="Submit your signup with RSN and a screenshot")
     @app_commands.describe(rsn="Your RSN (RuneScape name)", screenshot="Upload a screenshot for your signup")
@@ -2194,7 +2175,6 @@ class MonopolyCog(commands.Cog):
             print(f"❌ Error clearing {column_name} flag for {team_name}: {e}")
     
     @app_commands.command(name="show_drops", description="Show available drops and prices for your current tile.")
-    @app_commands.checks.has_any_role(*TEAM_ROLES)
     async def show_drops(self, interaction: Interaction):
         team_name = None
         for role in interaction.user.roles:
@@ -5623,7 +5603,7 @@ class MonopolyCog(commands.Cog):
             return
 
         team_name = team_role.name
-        if team_name not in ACTIVE_TEAMS:
+        if team_name not in TEAM_ROLES:
             await interaction.response.send_message(f"❌ Please select a valid Team role. ({team_name} is not active).", ephemeral=True)
             return
 
