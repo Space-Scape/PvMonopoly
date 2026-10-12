@@ -2014,12 +2014,12 @@ class MonopolyCog(commands.Cog):
             1: ["Zulrah"], 3: ["General Graardor"],
             4: ["Phantom Muspah"], 5: ["The Whisperer"], 6: ["Callisto"],
             8: ["Vet'ion"], 9: ["Venenatis"], 10: ["Gauntlet", "Nex"], 11: ["Corp"],
-            13: ["Moons of Peril"], 14: ["Hueycoatl"], 15: ["Duke Sucellus"], 16: ["Wintertodt", "Zalcano", "Tempoross"],
+            13: ["Moons of Peril"], 14: ["Hueycoatl"], 15: ["Duke Sucellus"], 16: ["Maggot King"],
             18: ["K'ril Tsutsaroth"], 19: ["Abyssal Sire", "Alchemical Hydra", "Araxxor", "Cerberus", "Grotesque Guardians", "Kraken", "Thermonuclear Smoke Devil"],
             21: ["Tombs of Amascut"], 23: ["Theatre of Blood"], 24: ["Chambers of Xeric"],
             25: ["Vardorvis"], 26: ["Yama"], 27: ["Colosseum"], 29: ["Doom of Mokhaiotl"],
             31: ["Kree'arra"], 32: ["Kalphite Queen"], 34: ["Nightmare"],
-            35: ["The Leviathan"], 37: ["Zilyana"], 39: ["Scorpia, King Black Dragon"]
+            35: ["The Leviathan"], 37: ["Zilyana"], 39: ["Mad Angel"]
         }
 
 
@@ -2287,8 +2287,6 @@ class MonopolyCog(commands.Cog):
                 value=(
                     "**/use_card:** Lets you see and use the cards your team is holding.\n"
                     "**/buy_house:** Landed on a tile? Use this to buy a house for it (up to 4).\n"
-                    "**/customize:** Change your character's icon and color!\n"
-                    "**/player_request:** Draft a player to your team."
                 ),
                 inline=False
             )
@@ -2569,12 +2567,12 @@ class MonopolyCog(commands.Cog):
             1: ["Zulrah"], 3: ["General Graardor"],
             4: ["Phantom Muspah"], 5: ["The Whisperer"], 6: ["Callisto"],
             8: ["Vet'ion"], 9: ["Venenatis"], 10: ["Gauntlet", "Nex"], 11: ["Corp"],
-            13: ["Moons of Peril"], 14: ["Hueycoatl"], 15: ["Duke Sucellus"], 16: ["Wintertodt", "Zalcano", "Tempoross"],
+            13: ["Moons of Peril"], 14: ["Hueycoatl"], 15: ["Duke Sucellus"], 16: ["Maggot King"],
             18: ["K'ril Tsutsaroth"], 19: ["Abyssal Sire", "Alchemical Hydra", "Araxxor", "Cerberus", "Grotesque Guardians", "Kraken", "Thermonuclear Smoke Devil"],
             21: ["Tombs of Amascut"], 23: ["Theatre of Blood"], 24: ["Chambers of Xeric"],
             25: ["Vardorvis"], 26: ["Yama"], 27: ["Colosseum"], 29: ["Doom of Mokhaiotl"],
             31: ["Kree'arra"], 32: ["Kalphite Queen"], 34: ["Nightmare"],
-            35: ["The Leviathan"], 37: ["Zilyana"], 39: ["Scorpia, King Black Dragon"]
+            35: ["The Leviathan"], 37: ["Zilyana"], 39: ["Mad Angel"]
         }
 
         bosses_for_tile = tile_boss_map.get(current_tile, [])
@@ -2585,7 +2583,7 @@ class MonopolyCog(commands.Cog):
 
         # 3. Route UI
         warning_text = (
-            "⚠️ **Notice:** Submitting a drop here locks you into the **Main Fighter** role for this tile.\n"
+            "⚠️ **Notice:** Submitting a drop here locks you into the **Main Board** for this tile.\n"
             "You will **NOT** be able to use `/scavenge` for off-board bosses until your team moves to a new tile.\n\n"
         )
 
