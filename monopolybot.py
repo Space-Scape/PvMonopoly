@@ -1418,6 +1418,37 @@ class MonopolyCog(commands.Cog):
         except Exception as e:
             print(f"Error setting teleblock status for {team_name}: {e}")
 
+    @app_commands.command(name="select_channels", description="[Staff] Update the channel used for game logs, drop logs, or reviews.")
+    @app_commands.describe(
+        target="The specific log you want to assign a new channel to",
+        channel="Select the new channel from the server list"
+    )
+    @app_commands.choices(target=[
+        app_commands.Choice(name="Game Log", value="game_log"),
+        app_commands.Choice(name="Review Channel", value="review_channel"),
+        app_commands.Choice(name="Drop Log", value="drop_log")
+    ])
+    async def select_channels(self, interaction: discord.Interaction, target: app_commands.Choice[str], channel: discord.TextChannel):
+        if not self.has_event_staff_role(interaction.user):
+            await interaction.response.send_message("❌ Only Staff can use this command.", ephemeral=True)
+            return
+
+        global REVIEW_CHANNEL, LOG_CHANNEL, GAME_LOG_CHANNEL_ID
+        
+        target_value = target.value
+        
+        if target_value == "game_log":
+            GAME_LOG_CHANNEL_ID = channel.id
+            await interaction.response.send_message(f"✅ **Game Log** updated to {channel.mention}.", ephemeral=True)
+            
+        elif target_value == "review_channel":
+            REVIEW_CHANNEL = str(channel.id)
+            await interaction.response.send_message(f"✅ **Review Channel** updated to {channel.mention}.", ephemeral=True)
+            
+        elif target_value == "drop_log":
+            LOG_CHANNEL = str(channel.id)
+            await interaction.response.send_message(f"✅ **Drop Log** updated to {channel.mention}.", ephemeral=True)
+            
     @app_commands.command(name="start_game", description="[Staff] Start the game and deal 3 random cards to all active teams.")
     async def start_game(self, interaction: discord.Interaction):
         if not self.has_event_staff_role(interaction.user):
