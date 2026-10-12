@@ -1054,7 +1054,7 @@ class MonopolyCog(commands.Cog):
                                         await asyncio.to_thread(self.cog.team_data_sheet.update_cell, o_idx, gp_col_index, new_owner_gp)
                                         
                                         tax_message = (
-                                            f"<:houseicon:1438085020156821555> **House Tax:** {team_name} paid **{tax_amount:,} GP** "
+                                            f"<:pohvoucher:1558986290895003780> **House Tax:** {team_name} paid **{tax_amount:,} GP** "
                                             f"to **{owner_team}** for a level {house_count} house on tile {current_tile_for_tax} "
                                             f"(Original Value: **{original_gp_value_pre_tax:,} GP** | Tax: **{int(tax_percent * 100)}%**)."
                                         )
@@ -2230,7 +2230,7 @@ class MonopolyCog(commands.Cog):
                 houses_output += f"**{i}. {entry['team']}**: {entry['value']}\n"
 
             embed = discord.Embed(
-                title="🌐 Monopoly Board Leaderboard",
+                title="🌐 Monopoly Leaderboard",
                 description="Current progress stats for all teams.",
                 color=discord.Color.blue()
             )
@@ -2239,10 +2239,10 @@ class MonopolyCog(commands.Cog):
                 embed.add_field(name="<:MaxCash:1558959942394847372> GP Holdings", value=gp_output, inline=True)
                 
             if passes_output:
-                embed.add_field(name="🚶 Go Passes", value=passes_output, inline=True)
+                embed.add_field(name="<:go:1559018777343950848> Go Passes", value=passes_output, inline=True)
 
             if houses_output:
-                embed.add_field(name="<:houseicon:1438085020156821555> Houses Owned", value=houses_output, inline=True)
+                embed.add_field(name="<:pohvoucher:1558986290895003780> Houses Owned", value=houses_output, inline=True)
                 
             await interaction.followup.send(embed=embed)
 
@@ -2322,7 +2322,6 @@ class MonopolyCog(commands.Cog):
 
             cost = COST_MAP.get(house_count, 999_999_999)
 
-            # --- <:charos:1558985798483837049> RING OF CHAROS CHECK ---
             has_charos = str(team_info.get("Ring of Charos", "no")).strip().lower() == "yes"
             if has_charos:
                 cost = cost // 2
@@ -2349,7 +2348,7 @@ class MonopolyCog(commands.Cog):
                 await asyncio.to_thread(self.consume_charos, team_name)
                 charos_msg = f"\n\n<:charos:1558985798483837049> *Your **Ring of Charos** charmed the real estate agent, securing a 50% discount! The ring shatters!*"
 
-            buy_msg = f"<:houseicon:1438085020156821555> **{team_name}** bought a house on tile **{current_pos}** for **{cost:,} GP**!{charos_msg}"
+            buy_msg = f"<:pohvoucher:1558986290895003780> **{team_name}** bought a house on tile **{current_pos}** for **{cost:,} GP**!{charos_msg}"
             await interaction.followup.send(buy_msg)
             await self.mirror_to_game_log(interaction.channel, content=buy_msg)
 
@@ -3225,7 +3224,7 @@ class MonopolyCog(commands.Cog):
         embed = discord.Embed(
             title=f"{team_name}'s Inventory",
             color=discord.Color.purple(),
-            description="Active passives and held items:"
+            description=""
         )
 
         passives_text = ""
@@ -3324,7 +3323,7 @@ class MonopolyCog(commands.Cog):
             
             if used_card_flag == "yes":
                 if has_double_card:
-                    double_card_note = "\n\n<:count_check:1559005679656763452> **Count Check says:** You have no card uses remaining this turn (bleeeh bleeeh!)."
+                    double_card_note = "\n\n<:count_check:1559005679656763452> **Count Check says:** You have no card uses remaining this turn!)."
                     asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "Double Card"))
                 else:
                     await interaction.followup.send("❌ You can only use one card per turn. Roll again to use another card.", ephemeral=True)
@@ -3514,7 +3513,7 @@ class MonopolyCog(commands.Cog):
                 
                 victim_channel = self.get_team_channel(target_team)
 
-                # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+                # --- PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
@@ -3788,10 +3787,8 @@ class MonopolyCog(commands.Cog):
                     
                     opponent_pos = int(record.get("Position", -1))
                     
-                    # Calculate distance, wrapping around GO
                     dist = (opponent_pos - caster_pos) % BOARD_SIZE
                     
-                    # Only target if they are 1 to 5 tiles ahead
                     if 1 <= dist <= 5:
                         opponents_ahead.append((opponent_team_name, opponent_pos, dist))
                 
@@ -3811,7 +3808,7 @@ class MonopolyCog(commands.Cog):
                 embed_description = ""
                 victim_channel = self.get_team_channel(target_team)
 
-                # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+                # --- PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
@@ -3964,7 +3961,7 @@ class MonopolyCog(commands.Cog):
                 for target_team, target_pos in targets:
                     victim_channel = self.get_team_channel(target_team)
                     
-                    # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+                    # --- PASSIVE CHECKS ---
                     victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                     has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
@@ -4148,7 +4145,7 @@ class MonopolyCog(commands.Cog):
                 
                 if house_placed_successfully:
                     await asyncio.to_thread(self.log_command, team_name, "/card_effect_place_house_free", {"team": team_name, "tile": caster_pos})
-                    embed_description = f"> <:houseicon:1438085020156821555> Placed a **free house** on tile **{caster_pos}**!"
+                    embed_description = f"> <:pohvoucher:1558986290895003780> Placed a **free house** on tile **{caster_pos}**!"
                 else:
                     await interaction.followup.send("❌ A database error occurred while trying to place the house. Your card was not consumed.", ephemeral=True)
                     return
@@ -4259,7 +4256,7 @@ class MonopolyCog(commands.Cog):
                 victim_channel = self.get_team_channel(target_team)
                 embed_description = ""
 
-                # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+                # --- PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
@@ -4422,7 +4419,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 return
 
-            # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+            # --- PASSIVE CHECKS ---
             team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             victim_info = next((r for r in team_records if r.get("Team") == victim_team), {})
             has_protect = str(victim_info.get("Protect Item", "no")).strip().lower() == "yes"
@@ -4636,7 +4633,7 @@ class MonopolyCog(commands.Cog):
             target_row_idx = all_teams_data.index(target_record) + 2
             caster_row_idx = all_teams_data.index(caster_record) + 2
 
-            # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+            # --- PASSIVE CHECKS ---
             has_protect = str(target_record.get("Protect Item", "no")).strip().lower() == "yes"
             has_recoil = str(target_record.get("Ring of Recoil", "no")).strip().lower() == "yes"
 
@@ -4768,7 +4765,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 return  
 
-            # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
+            # --- PASSIVE CHECKS ---
             team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             victim_info = next((r for r in team_records if r.get("Team") == victim_team), {})
             has_protect = str(victim_info.get("Protect Item", "no")).strip().lower() == "yes"
