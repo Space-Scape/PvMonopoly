@@ -13,45 +13,56 @@ import traceback
 from discord.ui import Modal, TextInput
 from discord import app_commands, ui, Interaction, Member, TextStyle
 from typing import List, Optional
-from discord import ui, Interaction, Member
-from typing import Optional
 from discord import SelectOption, Attachment
-from discord import ui, Interaction, SelectOption, TextStyle, Attachment, Member
 
 # ========== CONFIG ==========
-SPREADSHEET_ID = "1OVC8HImUpoh2keU-h2v_b2gFDa4zyfWsaJxBWRoSJ08"
-SIGNUP_SPREADSHEET_ID = "1c7TzXlyn8KinCKNJadIBfY_6PcXF-9icbfC_E8NAGqI"
-TEAM_ROLES = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7"]
+CONFIG_FILE = "bot_config.json"
 
-REVIEW_CHANNEL = "1558574050740281466"
-LOG_CHANNEL = "1558574472787791972"
-GAME_LOG_CHANNEL_ID = 1558574136127787049
-GAME_LOG_TEAM_COLOR_MAP = {
-    "Team 1": 0x00BCD4,
-    "Team 2": 0x9B59B6,
-    "Team 3": 0xE74C3C,
-    "Team 4": 0x2ECC71,
-    "Team 5": 0x00BCD4,
-    "Team 6": 0xC4A484,
-    "Team 7": 0x3498DB,
+CONFIG = {
+    "SPREADSHEET_ID": "1OVC8HImUpoh2keU-h2v_b2gFDa4zyfWsaJxBWRoSJ08",
+    "SIGNUP_SPREADSHEET_ID": "1c7TzXlyn8KinCKNJadIBfY_6PcXF-9icbfC_E8NAGqI",
+    "REVIEW_CHANNEL": 1558574050740281466,
+    "LOG_CHANNEL": 1558574472787791972,
+    "GAME_LOG_CHANNEL_ID": 1558574136127787049,
+    "EVENT_STAFF_ROLE_ID": 1558581672268537856,
+    "EVENT_CAPTAIN_ROLE_ID": 1558581790946500628,
+    "BINGO_PLAYER_ROLE_ID": 1558581910211526756,
+    "TEAM_ROLES": ["Team 1", "Team 2", "Team 3"],
+    "ACTIVE_TEAMS": ["Team 1", "Team 2", "Team 3"],
+    "TEAM_CHANNELS_MAP": {},
+    "GAME_LOG_TEAM_COLOR_MAP": {
+        "Team 1": 0x00BCD4,
+        "Team 2": 0x9B59B6,
+        "Team 3": 0xE74C3C,
+        "Team 4": 0x2ECC71,
+        "Team 5": 0x00BCD4,
+        "Team 6": 0xC4A484,
+        "Team 7": 0x3498DB,
+    }
 }
 
+if os.path.exists(CONFIG_FILE):
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            loaded_config = json.load(f)
+            CONFIG.update(loaded_config)
+    except json.JSONDecodeError:
+        print(f"⚠️ Warning: {CONFIG_FILE} is empty or corrupted. Using defaults.")
 
-TEAM_CHANNELS_MAP = {
-    "Team 1": 1558575253792366632,
-    "Team 2": 1558575281076437102,
-    "Team 3": 1558575310172061876
-}
+SPREADSHEET_ID = CONFIG["SPREADSHEET_ID"]
+SIGNUP_SPREADSHEET_ID = CONFIG["SIGNUP_SPREADSHEET_ID"]
+REVIEW_CHANNEL = str(CONFIG["REVIEW_CHANNEL"])
+LOG_CHANNEL = str(CONFIG["LOG_CHANNEL"])
+GAME_LOG_CHANNEL_ID = int(CONFIG["GAME_LOG_CHANNEL_ID"])
+EVENT_STAFF_ROLE_ID = int(CONFIG["EVENT_STAFF_ROLE_ID"])
+EVENT_CAPTAIN_ROLE_ID = int(CONFIG["EVENT_CAPTAIN_ROLE_ID"])
+BINGO_PLAYER_ROLE_ID = int(CONFIG["BINGO_PLAYER_ROLE_ID"])
+TEAM_ROLES = CONFIG["TEAM_ROLES"]
+ACTIVE_TEAMS = CONFIG["ACTIVE_TEAMS"]
+TEAM_CHANNELS_MAP = CONFIG["TEAM_CHANNELS_MAP"]
+GAME_LOG_TEAM_COLOR_MAP = CONFIG["GAME_LOG_TEAM_COLOR_MAP"]
+
 TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
-
-ACTIVE_TEAMS = ["Team 1", "Team 2", "Team 3"]
-TEAM_LIST_CONFIG_FILE = "team_list_config.json"
-
-SIGNUP_LIST_CONFIG_FILE = "signup_list_config.json"
-
-EVENT_STAFF_ROLE_ID = 1558581672268537856
-EVENT_CAPTAIN_ROLE_ID = 1558581790946500628
-BINGO_PLAYER_ROLE_ID = 1558581910211526756
 
 BOARD_SIZE = 40
 
