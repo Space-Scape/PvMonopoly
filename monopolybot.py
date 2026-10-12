@@ -1429,7 +1429,7 @@ class MonopolyCog(commands.Cog):
         for team_name in ACTIVE_TEAMS:
             team_chan = self.get_team_channel(team_name)
             if team_chan:
-                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** Here are your 3 starting cards. (Type /use_card followed by the [index number] to use cards):")
+                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** <a:fire:1559013496455168082> \n\nHere are your 3 starting cards:")
                 for _ in range(3):
                     card_type = random.choice(["Chest", "Chance"])
                     await self.team_receives_card(team_name, card_type, team_chan)
