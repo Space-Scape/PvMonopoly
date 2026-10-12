@@ -110,7 +110,7 @@ ROLL_GRANTING_TILES = {GO_TILE, BANK_STANDING_TILE} | GLIDER_TILES | CHEST_TILES
 SCAVENGER_BOSSES = [
     "Dagannoth Kings",
     "Sarachnis",
-    "Royal Titans",
+    "Giant Mole",
     "Vorkath"
 ]
 
@@ -129,6 +129,7 @@ boss_drops = {
     "Duke Sucellus": ["Baron", "Virtus mask", "Virtus robe top", "Virtus robe bottom", "Chromium ingot", "Magus vestige", "Eye of the duke", "Ice quartz"],
     "Gauntlet": ["Youngllef", "Crystal weapon seed", "Crystal armour seed", "Enhanced crystal weapon seed"],
     "General Graardor": ["Pet general graardor", "Bandos hilt", "Bandos chestplate", "Bandos tassets", "Bandos boots"],
+    "Giant Mole": ["Immaculate mole skin"],
     "Grotesque Guardians": ["Noon", "Black tourmaline core", "Granite gloves", "Granite ring", "Granite hammer", "Jar of stone"],
     "Hueycoatl": ["Huberte", "Dragon hunter wand", "Hueycoatl hide", "Tome of earth (empty)"],
     "Kalphite Queen": ["Kalphite princess", "Kq head", "Jar of sand", "Dragon 2h sword", "Dragon chainbody", "Dragon pickaxe"],
@@ -136,6 +137,8 @@ boss_drops = {
     "Kraken": ["Pet kraken", "Kraken tentacle", "Trident of the seas (full)", "Jar of dirt"],
     "Kree'arra": ["Pet kree'arra", "Armadyl helmet", "Armadyl chestplate", "Armadyl chainskirt", "Armadyl hilt"],
     "K'ril Tsutsaroth": ["Pet K'ril Tsutsaroth", "Zamorakian spear", "Staff of the dead", "Zamorak hilt", "Steam battlestaff"],
+    "Mad Angel": ["Hallowfell", "Jar of light"],
+    "Maggot King": ["Maggot marquess", "Crimson kisten", "Elder venator fang"],
     "Moons of Peril": ["Eclipse atlatl", "Eclipse moon helm", "Eclipse moon chestplate", "Eclipse moon tassets", "Dual macuahuitl", "Blood moon helm", "Blood moon chestplate", "Blood moon tassets", "Blue moon spear", "Blue moon helm", "Blue moon chestplate", "Blue moon tassets"],
     "Nightmare": ["Little nightmare", "Nightmare staff", "Inquisitor's great helm", "Inquisitor's hauberk", "Inquisitor's plateskirt", "Inquisitor's mace", "Eldritch orb", "Harmonised orb", "Volatile orb", "Parasitic egg", "Jar of dreams", "Slepey tablet"],
     "Nex": ["Nexling", "Ancient hilt", "Nihil horn", "Zaryte vambraces", "Torva full helm (damaged)", "Torva platebody (damaged)", "Torva platelegs (damaged)"],
@@ -1110,7 +1113,7 @@ class MonopolyCog(commands.Cog):
                             "Vorkath": "Scavenged Vorkath",
                             "Dagannoth Kings": "Scavenged DKS",
                             "Sarachnis": "Scavenged Sarachnis",
-                            "Royal Titans": "Scavenged Titans"
+                            "Giant Mole": "Scavenged Mole"
                         }
                         
                         missing_cols = [col for col in boss_col_map.values() if col not in headers]
@@ -1120,12 +1123,12 @@ class MonopolyCog(commands.Cog):
                             vork_idx = headers.index("Scavenged Vorkath") + 1
                             dks_idx = headers.index("Scavenged DKS") + 1
                             sara_idx = headers.index("Scavenged Sarachnis") + 1
-                            titan_idx = headers.index("Scavenged Titans") + 1
+                            titan_idx = headers.index("Scavenged Mole") + 1
                             
                             vork_done = str(target_record.get("Scavenged Vorkath", "")).strip().lower() in ["yes", "true", "1"]
                             dks_done = str(target_record.get("Scavenged DKS", "")).strip().lower() in ["yes", "true", "1"]
                             sara_done = str(target_record.get("Scavenged Sarachnis", "")).strip().lower() in ["yes", "true", "1"]
-                            titan_done = str(target_record.get("Scavenged Titans", "")).strip().lower() in ["yes", "true", "1"]
+                            titan_done = str(target_record.get("Scavenged Mole", "")).strip().lower() in ["yes", "true", "1"]
                             
                             target_col_name = boss_col_map.get(self.boss)
                             target_col_idx = headers.index(target_col_name) + 1
@@ -1133,7 +1136,7 @@ class MonopolyCog(commands.Cog):
                             if self.boss == "Vorkath": vork_done = True
                             elif self.boss == "Dagannoth Kings": dks_done = True
                             elif self.boss == "Sarachnis": sara_done = True
-                            elif self.boss == "Royal Titans": titan_done = True
+                            elif self.boss == "Giant Mole": titan_done = True
                             
                             has_all_4 = vork_done and dks_done and sara_done and titan_done
                             
@@ -1828,7 +1831,7 @@ class MonopolyCog(commands.Cog):
             vork_idx = headers.index("Scavenged Vorkath") + 1
             dks_idx = headers.index("Scavenged DKS") + 1
             sara_idx = headers.index("Scavenged Sarachnis") + 1
-            titan_idx = headers.index("Scavenged Titans") + 1
+            titan_idx = headers.index("Scavenged Mole") + 1
             
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, vork_idx, "")
             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, dks_idx, "")
@@ -2456,7 +2459,7 @@ class MonopolyCog(commands.Cog):
             vork_done = str(team_info.get("Scavenged Vorkath", "")).strip().lower() in ["yes", "true", "1"]
             dks_done = str(team_info.get("Scavenged DKS", "")).strip().lower() in ["yes", "true", "1"]
             sara_done = str(team_info.get("Scavenged Sarachnis", "")).strip().lower() in ["yes", "true", "1"]
-            titan_done = str(team_info.get("Scavenged Titans", "")).strip().lower() in ["yes", "true", "1"]
+            titan_done = str(team_info.get("Scavenged Mole", "")).strip().lower() in ["yes", "true", "1"]
             
             if vork_done and dks_done and sara_done and titan_done:
                 await interaction.followup.send("❌ **Action Denied:** You completed a Scavenger Bingo on this tile and triggered the Skip Tax. You forfeit the right to build here for the remainder of this turn!", ephemeral=True)
@@ -2674,8 +2677,8 @@ class MonopolyCog(commands.Cog):
                 completed_bosses.append("Dagannoth Kings")
             if str(team_record.get("Scavenged Sarachnis", "")).strip().lower() in ["yes", "true", "1"]:
                 completed_bosses.append("Sarachnis")
-            if str(team_record.get("Scavenged Titans", "")).strip().lower() in ["yes", "true", "1"]:
-                completed_bosses.append("Royal Titans")
+            if str(team_record.get("Scavenged Mole", "")).strip().lower() in ["yes", "true", "1"]:
+                completed_bosses.append("Giant Mole")
                 
         available_bosses = [b for b in SCAVENGER_BOSSES if b not in completed_bosses]
         
