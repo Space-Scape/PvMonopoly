@@ -1418,6 +1418,37 @@ class MonopolyCog(commands.Cog):
         except Exception as e:
             print(f"Error setting teleblock status for {team_name}: {e}")
 
+    @app_commands.command(name="select_roles", description="[Staff] Update the roles used for Event Staff, Captains, or Bingo Players.")
+    @app_commands.describe(
+        target="The specific role category you want to update",
+        role="Select the new role from the server list"
+    )
+    @app_commands.choices(target=[
+        app_commands.Choice(name="Staff", value="event_staff"),
+        app_commands.Choice(name="Captain", value="event_captain"),
+        app_commands.Choice(name="Bingo Player", value="bingo_player")
+    ])
+    async def select_roles(self, interaction: discord.Interaction, target: app_commands.Choice[str], role: discord.Role):
+        if not self.has_event_staff_role(interaction.user) and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only Event Staff or Administrators can use this command.", ephemeral=True)
+            return
+
+        global EVENT_STAFF_ROLE_ID, EVENT_CAPTAIN_ROLE_ID, BINGO_PLAYER_ROLE_ID
+        
+        target_value = target.value
+        
+        if target_value == "event_staff":
+            EVENT_STAFF_ROLE_ID = role.id
+            await interaction.response.send_message(f"✅ **Event Staff** role routing successfully updated to {role.mention}.", ephemeral=True)
+            
+        elif target_value == "event_captain":
+            EVENT_CAPTAIN_ROLE_ID = role.id
+            await interaction.response.send_message(f"✅ **Event Captain** role routing successfully updated to {role.mention}.", ephemeral=True)
+            
+        elif target_value == "bingo_player":
+            BINGO_PLAYER_ROLE_ID = role.id
+            await interaction.response.send_message(f"✅ **Bingo Player** role routing successfully updated to {role.mention}.", ephemeral=True)
+    
     @app_commands.command(name="select_channels", description="[Staff] Update the channel used for game logs, drop logs, or reviews.")
     @app_commands.describe(
         target="The specific log you want to assign a new channel to",
