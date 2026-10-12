@@ -13,7 +13,10 @@ import traceback
 from discord.ui import Modal, TextInput
 from discord import app_commands, ui, Interaction, Member, TextStyle
 from typing import List, Optional
+from discord import ui, Interaction, Member
+from typing import Optional
 from discord import SelectOption, Attachment
+from discord import ui, Interaction, SelectOption, TextStyle, Attachment, Member
 
 # ========== CONFIG ==========
 CONFIG_FILE = "bot_config.json"
