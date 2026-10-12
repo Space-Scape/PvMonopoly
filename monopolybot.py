@@ -1443,7 +1443,7 @@ class MonopolyCog(commands.Cog):
             await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
             return
             
-        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
+        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR, CONFIG
         
         team_name = role.name
         
@@ -1461,14 +1461,15 @@ class MonopolyCog(commands.Cog):
         GAME_LOG_TEAM_COLOR_MAP[team_name] = color_int
         TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
         
+        # --- NEW UNIFIED SAVE LOGIC ---
+        CONFIG["TEAM_ROLES"] = TEAM_ROLES
+        CONFIG["ACTIVE_TEAMS"] = ACTIVE_TEAMS
+        CONFIG["TEAM_CHANNELS_MAP"] = TEAM_CHANNELS_MAP
+        CONFIG["GAME_LOG_TEAM_COLOR_MAP"] = GAME_LOG_TEAM_COLOR_MAP
+        
         try:
-            with open(TEAM_LIST_CONFIG_FILE, "w") as f:
-                json.dump({
-                    "TEAM_ROLES": TEAM_ROLES,
-                    "ACTIVE_TEAMS": ACTIVE_TEAMS,
-                    "TEAM_CHANNELS_MAP": TEAM_CHANNELS_MAP,
-                    "GAME_LOG_TEAM_COLOR_MAP": GAME_LOG_TEAM_COLOR_MAP
-                }, f, indent=4)
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(CONFIG, f, indent=4)
         except Exception as e:
             await interaction.response.send_message(f"❌ Added to live memory, but failed to save to file: {e}", ephemeral=True)
             return
@@ -1487,7 +1488,7 @@ class MonopolyCog(commands.Cog):
             await interaction.response.send_message("❌ Only Event Staff can use this command.", ephemeral=True)
             return
             
-        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR
+        global TEAM_ROLES, ACTIVE_TEAMS, TEAM_CHANNELS_MAP, GAME_LOG_TEAM_COLOR_MAP, TEAM_CHANNEL_IDS_AS_STR, CONFIG
         
         team_name = role.name
         
@@ -1504,19 +1505,19 @@ class MonopolyCog(commands.Cog):
         GAME_LOG_TEAM_COLOR_MAP.pop(team_name, None)
         TEAM_CHANNEL_IDS_AS_STR = [str(cid) for cid in TEAM_CHANNELS_MAP.values()]
         
+        CONFIG["TEAM_ROLES"] = TEAM_ROLES
+        CONFIG["ACTIVE_TEAMS"] = ACTIVE_TEAMS
+        CONFIG["TEAM_CHANNELS_MAP"] = TEAM_CHANNELS_MAP
+        CONFIG["GAME_LOG_TEAM_COLOR_MAP"] = GAME_LOG_TEAM_COLOR_MAP
+        
         try:
-            with open(TEAM_LIST_CONFIG_FILE, "w") as f:
-                json.dump({
-                    "TEAM_ROLES": TEAM_ROLES,
-                    "ACTIVE_TEAMS": ACTIVE_TEAMS,
-                    "TEAM_CHANNELS_MAP": TEAM_CHANNELS_MAP,
-                    "GAME_LOG_TEAM_COLOR_MAP": GAME_LOG_TEAM_COLOR_MAP
-                }, f, indent=4)
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(CONFIG, f, indent=4)
         except Exception as e:
             await interaction.response.send_message(f"❌ Removed from live memory, but failed to save to file: {e}", ephemeral=True)
             return
             
-        await interaction.response.send_message(f"🗑️ Successfully removed **{team_name}** from the game. (You can also delete their row from the `TeamData` sheet).", ephemeral=True)
+        await interaction.response.send_message(f"🗑️ Successfully removed **{team_name}** from the game.", ephemeral=True)
         
     @app_commands.command(name="select_roles", description="[Staff] Update the roles used for Event Staff, Captains, or Bingo Players.")
     @app_commands.describe(
