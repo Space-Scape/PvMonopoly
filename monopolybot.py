@@ -57,26 +57,26 @@ BOARD_SIZE = 40
 
 # ========== CARD EMOJI MAPPING ==========
 CARD_EMOJIS = {
-    "Escape Crystal": "<:dragonstone:1437979925863862363>", 
-    "Pickpocket": "<:thieving:1437980167791448237>",
-    "Low Alchemy": "<:gold:1406230459301630043>",
+    "Escape Crystal": "<:crystal:1558986564124545065>", 
+    "Pickpocket": "<:pickpocket:1558986509242212412>",
+    "Low Alchemy": "<:lowalch:1558986671725351063>",
     "High Alchemy": "<:MaxCash:1558959942394847372>",
-    "Vengeance": "<:venge:1438084953559797884>",
-    "Redemption": "<:redemption:1437979567900987493>",
-    "Elder Maul": "<:maul:1437979898865258668>",
-    "Vile Vigour": "<:agility:1437979594257993778>",
-    "Varrock Tele": "<:varrocktele:1438084982491840583>",
-    "POH Voucher": "<:houseicon:1438085020156821555>",
-    "Home Tele": "<:housetele:1437980013831131206>",
-    "Dragon Spear": "<:dragonspear:1437980060567994399>",
-    "Rogue's Gloves": "<:rogue_gloves:1437980096790134914>",
-    "Lure": "<:fishing:1437980297017688114>",
-    "Backstab": "<:boner:1438085053102948383>",
-    "Smite": "<:smite:1437979867084881950>",
-    "Tele Other": "<:teleother:1437980130407350375>",
-    "Tele Block": "<:teleblock:1438088930816819271>",
-    "Chest": "<:chest:1437979807362191441>",
-    "Chance": "<:questioning:1287623035381350441>"
+    "Vengeance": "<:venge:1558986464409297077>",
+    "Redemption": "<:redemption:1558985458195898389>",
+    "Elder Maul": "<:eldermaul:1558986407735861359>",
+    "Vile Vigour": "<:vilevigour:1558986367558492200>",
+    "Varrock Tele": "<:varrocktele:1558986322532896788>",
+    "POH Voucher": "<:pohvoucher:1558986290895003780>",
+    "Home Tele": "<:housetp:1558986199685795901>",
+    "Dragon Spear": "<:dragon_spear:1558986141846347776>",
+    "Rogue's Gloves": "<:roguegloves:1558986623486660648>",
+    "Lure": "<:lure:1558986093796392960>",
+    "Backstab": "<:boner:1558986033440489563>",
+    "Smite": "<:smite:1558986008404697199>",
+    "Tele Other": "<:teleother:1558985957561213000>",
+    "Tele Block": "<:teleblock:1558985901831364710>",
+    "Chest": "<:chest:1558985858516787251>",
+    "Chance": "<:chance:1558993615152353360>"
 }
 
 GO_TILE = 0
@@ -536,12 +536,12 @@ class MonopolyCog(commands.Cog):
                         self.house_data_sheet.update_acell(f"C{idx}", team_name)
                         self.house_data_sheet.update_acell(f"D{idx}", str(count))
                         updated = True
-                        print(f"<:housetele:1437980013831131206> Updated existing house on tile {tile_number} for {team_name} (now {count} houses).")
+                        print(f"<:housetp:1558986199685795901> Updated existing house on tile {tile_number} for {team_name} (now {count} houses).")
                         break
 
                 if not updated:
                     self.house_data_sheet.append_row([tile_number, "", team_name, 1])
-                    print(f"<:housetele:1437980013831131206> Added new free house for {team_name} on tile {tile_number}.")
+                    print(f"<:housetp:1558986199685795901> Added new free house for {team_name} on tile {tile_number}.")
 
                 self.sync_houses_owned(team_name)
 
@@ -647,9 +647,9 @@ class MonopolyCog(commands.Cog):
             
             if is_gp_halved:
                 asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "GP Halved"))
-                return f"\n\n💰 **PASS GO!** You crossed GO and received **10,000,000 GP** (Halved by 🌳 **The Ents**!) and **3 Random Cards**!"
+                return f"\n\n<:go:1559018777343950848> **PASS GO!** You crossed GO and received **10,000,000 GP** (Halved by <:ent:1558999589317640262> **The Ents**!) and **3 Random Cards**!"
             
-            return f"\n\n💰 **PASS GO!** You crossed GO and received **20,000,000 GP** and **3 Random Cards**!"
+            return f"\n\n<:go:1559018777343950848> **PASS GO!** You crossed GO and received **20,000,000 GP** and **3 Random Cards**!"
             
         except Exception as e:
             print(f"❌ Error processing manual Pass Go: {e}")
@@ -969,7 +969,7 @@ class MonopolyCog(commands.Cog):
                         if is_gp_doubled:
                             bonus_parts.append("Doubled by 🎯 **Pinball Troll**")
                         if is_gp_halved:
-                            bonus_parts.append("Halved by 🌳 **The Ents**")
+                            bonus_parts.append("Halved by <:ent:1558999589317640262> **The Ents**")
                             
                         alchemy_bonus = f" ({', '.join(bonus_parts)}!)" if bonus_parts else ""
 
@@ -1002,7 +1002,7 @@ class MonopolyCog(commands.Cog):
                                         tax_amount = 0
                                         
                                         phoenix_msg = (
-                                            f"<:pneck:1469359523989819392> **Phoenix Necklace Shattered!** **{team_name}** was about to pay "
+                                            f"<:pneck:1558990483110367242> **Phoenix Necklace Shattered!** **{team_name}** was about to pay "
                                             f"**{blocked_tax:,} GP** in taxes to **{owner_team}**, but the necklace completely absorbed the blow!"
                                         )
                                         
@@ -1159,11 +1159,11 @@ class MonopolyCog(commands.Cog):
                                     tax_msg = "🏠 **Skip Tax:** You own zero houses, so the Bank couldn't repossess anything! (However, you forfeit the right to build on this tile for your current turn)."
 
                                 bingo_embed = discord.Embed(
-                                    title="🔥 SCAVENGER BINGO COMPLETED! 🔥",
+                                    title="<:quest:1559017087723241593> SCAVENGING COMPLETED! <:quest:1559017087723241593>",
                                     description=(
                                         f"**{team_name}**'s scavengers have successfully hunted 1 drop from all 4 Scavenger Bosses on Tile {current_tile}!\n\n"
                                         f"{tax_msg}\n\n"
-                                        f"🎲 **The items surge and A FREE ROLL has been granted to the team!**"
+                                        f"🎲 **A FREE ROLL has been granted to the team!**"
                                     ),
                                     color=discord.Color.orange()
                                 )
@@ -1181,7 +1181,7 @@ class MonopolyCog(commands.Cog):
                                     await asyncio.to_thread(self.cog.team_data_sheet.update_cell, team_row_idx, prog_col_idx, boss_count)
                                 
                                 if team_chan:
-                                    await team_chan.send(f"💀 **Scavenger Drop Approved!**\nYour team has completed **{boss_count}/4** Scavenger bosses for this tile. (**{self.boss}** marked as complete!)")
+                                    await team_chan.send(f"<:quest:1559017087723241593> **Scavenger Drop Approved!**\nYour team has completed **{boss_count}/4** Scavenger bosses for this tile. (**{self.boss}** marked as complete!)")
 
                     if not is_scavenger:
                         tile_boss_map = self.cog._get_tile_boss_map()
@@ -1207,7 +1207,7 @@ class MonopolyCog(commands.Cog):
                         if scavenger_reward in ["Chest", "Chance"]:
                             if team_chan:
                                 scavenge_embed = discord.Embed(
-                                    title="📦 Scavenger Loot!",
+                                    title="<:chest:1558985858516787251> Scavenger Loot!",
                                     description=f"Your off-board grinding at **{self.boss}** paid off! Instead of GP, you found a **{scavenger_reward}** card!",
                                     color=discord.Color.purple()
                                 )
@@ -1246,11 +1246,11 @@ class MonopolyCog(commands.Cog):
                                 await asyncio.to_thread(self.cog.team_data_sheet.update_cell, t_idx, c_idx, "yes")
                                 
                                 emoji_map = {
-                                    "Protect Item": "<:inventory:1437979836881703074>", 
-                                    "Ring of Recoil": "💍", 
-                                    "Phoenix Necklace": "<:pneck:1469359523989819392>", 
-                                    "Ring of Charos": "💕",
-                                    "Ring of Stone": "🪨"
+                                    "Protect Item": "<:protect_item:1559003530050670632>", 
+                                    "Ring of Recoil": "<:recoil:1558985588055609374>", 
+                                    "Phoenix Necklace": "<:pneck:1558990483110367242>", 
+                                    "Ring of Charos": "<:charos:1558985798483837049>",
+                                    "Ring of Stone": "<:ring_of_stone:1558985677134241873>"
                                 }
                                 p_emoji = emoji_map.get(chosen_passive, "💎")
                                 
@@ -1429,12 +1429,10 @@ class MonopolyCog(commands.Cog):
         for team_name in ACTIVE_TEAMS:
             team_chan = self.get_team_channel(team_name)
             if team_chan:
-                await team_chan.send(f"🎉 **The game has begun!** Here are your 3 starting cards:")
+                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** Here are your 3 starting cards. (Type /use_card followed by the [index number] to use cards):")
                 for _ in range(3):
                     card_type = random.choice(["Chest", "Chance"])
                     await self.team_receives_card(team_name, card_type, team_chan)
-                    
-        await interaction.followup.send("✅ Game started! 3 random cards have been dealt to all active teams.")
     
     @app_commands.command(name="signup", description="Submit your signup with RSN and a screenshot")
     @app_commands.describe(rsn="Your RSN (RuneScape name)", screenshot="Upload a screenshot for your signup")
@@ -1532,7 +1530,7 @@ class MonopolyCog(commands.Cog):
             traceback.print_exc()
             await interaction.followup.send(f"❌ Failed to submit signup: {e}", ephemeral=True)
 
-    @app_commands.command(name="roll", description="Roll a dice (1-6) for MONOPOLY")
+    @app_commands.command(name="roll", description="Roll a dice (1-6)")
     async def roll(self, interaction: discord.Interaction):
         if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
             await interaction.response.send_message("❌ You can only use this command in your team's channel.", ephemeral=True)
@@ -1551,7 +1549,7 @@ class MonopolyCog(commands.Cog):
         try:
             cleared_cards = await asyncio.to_thread(self.clear_all_active_statuses, team_name)
             if cleared_cards and team_chan:
-                await team_chan.send(f"⌛️ **{team_name}**'s active status effects for: `({', '.join(cleared_cards)})` expired.")
+                await team_chan.send(f"<:hourglass:1559014128046051339> **{team_name}**'s active status effect for: `({', '.join(cleared_cards)})` expired.")
             
             await asyncio.to_thread(self.set_used_card_flag, team_name, "no")
             await asyncio.to_thread(self.set_bought_house_flag, team_name, "no")
@@ -1663,9 +1661,9 @@ class MonopolyCog(commands.Cog):
                 await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, gp_col, cur_gp + go_reward)
             
                 if is_gp_halved:
-                    go_message = f"💰 **PASS GO!** You passed **GO** and received **10,000,000 GP** (Halved by 🌳 **The Ents**!) and **3 Random Cards**!"
+                    go_message = f"<:MaxCash:1558959942394847372> **PASS GO!** You passed **GO** and received **10,000,000 GP** (Halved by <:ent:1558999589317640262> **The Ents**!) and **3 Random Cards**!"
                 else:
-                    go_message = f"💰 **CONGRATULATIONS!** You passed **GO** and received **20,000,000 GP** and **3 Random Cards**!"
+                    go_message = f"<:MaxCash:1558959942394847372> **CONGRATULATIONS!** You passed **GO** and received **20,000,000 GP** and **3 Random Cards**!"
                 
                 # ---> ADDED THIS LOOP <---
                 for _ in range(3):
@@ -1687,7 +1685,7 @@ class MonopolyCog(commands.Cog):
                 if cur_gp >= glider_fee:
                     cur_gp -= glider_fee
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, gp_col, cur_gp)
-                    glider_message = f"🪂 **Glider Flight:** The gnomes take an automatic payment of **8,000,000 GP** to use their glider!"
+                    glider_message = f"<:gnome_glider:1559011826442838066> **Glider Flight:** The gnomes take an automatic payment of **8,000,000 GP** to use their glider!"
                     
                     if new_pos == 12: 
                         new_pos = 28 if current_tile != 38 else 12
@@ -1707,9 +1705,9 @@ class MonopolyCog(commands.Cog):
                                 await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, gp_col, cur_gp + glider_reward)
                                 
                                 if is_gp_halved:
-                                    go_message = f"🌳🪂 **GLIDER BONUS REDUCED!** You flew over **GO**, but the Ents damaged your glider. You only received **10,000,000 GP** and **3 Random Cards**!"
+                                    go_message = f"<:ent:1558999589317640262> <:gnome_glider:1559011826442838066> **GLIDER BONUS REDUCED!** You flew over **GO**, but the Ents damaged your glider. You only received **10,000,000 GP** and **3 Random Cards**!"
                                 else:
-                                    go_message = "💰🪂 **GLIDER BONUS!** You flew over **GO** and received **20,000,000 GP** and **3 Random Cards**!"
+                                    go_message = "<:go:1559018777343950848> **GLIDER BONUS!** You flew over **GO** and received **20,000,000 GP** and **3 Random Cards**!"
                                 
                                 for _ in range(3):
                                     card_type = random.choice(["Chest", "Chance"])
@@ -1720,7 +1718,7 @@ class MonopolyCog(commands.Cog):
                         else:
                             new_pos = 38
                 else:
-                    glider_message = f"🚫💰 **You're Too Poor:** You cannot afford the gnome's **8,000,000 GP** glider fee! You stay on Tile {new_pos} and are granted a **Free Roll** instead!"
+                    glider_message = f"🚫 You cannot afford the gnome's **8,000,000 GP** glider fee! You stay on Tile {new_pos} and are granted a **Free Roll** instead!"
                     await asyncio.to_thread(self.increment_rolls_available, team_name)
                     
             except Exception as e:
@@ -1746,18 +1744,18 @@ class MonopolyCog(commands.Cog):
             
         roll_status_details = []
         if is_poisoned:
-            roll_status_details.append(f"🥀 *The Strange Plant's poison caps your roll at **3**!*")
+            roll_status_details.append(f"<:strange_plant:1558995237098094602> *The Strange Plant's poison caps your roll at **3**!*")
             
         roll_status_details.append(f"**{interaction.user.display_name}** rolled a **{raw_result}**!")
         
         if is_halved:
-            roll_status_details.append(f"🏋️ *The Demon's exhaustion cut your roll to **{result}**!*")
+            roll_status_details.append(f"<:sergeant_damien:1558999790556028998> *The Demon's exhaustion cut your roll to **{result}**!*")
         
         if roll_penalty > 0:
-            roll_status_details.append(f"🪦 *The Gravedigger's fatigue reduced your roll to **{result}**!*")
+            roll_status_details.append(f"<:leo:1558999609601294346> *The Gravedigger's fatigue reduced your roll to **{result}**!*")
             
         if roll_bonus > 0:
-            roll_status_details.append(f"🥪 *The Sandwich Lady's snack boosted your roll to **{result}**!*")
+            roll_status_details.append(f"<:sandwich_lady:1558999634096037898> *The Sandwich Lady's snack boosted your roll to **{result}**!*")
             
         roll_status_details.append(f"\nMoving to the **{tile_name}** tile.")
 
@@ -2044,14 +2042,14 @@ class MonopolyCog(commands.Cog):
                 title="How to Play (The Basics)",
                 description=(
                     "The whole game runs on drop submissions:\n"
-                    "1. **Submit a Drop:** A team member uses `/submitdrop` in the #drop-submission channel. Screenshots must **strictly** be in the room where the drop was received.\n"
-                    "2. **Get Approved:** Event Staff checks it out and approves it. All approvals have a chance for a rare passive drop!\n"
+                    "1. **Submit a Drop:** A team member uses `/submitdrop` in their team channel. Screenshots must **strictly** be in the room where the drop was received.\n"
+                    "2. **Get Approved:** Staff checks it out and approves it. All approvals have a chance for a rare passive drop!\n"
                     "3. **Get GP & a Roll:** Once it's approved, two things happen:\n"
                     "    - Your team gets GP for the drop.\n"
                     "    - Your team gets one roll.\n"
                     "4. **Use Your Roll:** Head to your team channel and use the `/roll` command.\n"
                     "5. **Move:** The bot rolls a 1-6, and your team moves on the board.\n"
-                    "6. **Repeat:** Keep submitting those drops to get more rolls!"
+                    "6. **Repeat:** Keep submitting drops to get more rolls!"
                 ),
                 color=discord.Color.green()
             )
@@ -2077,7 +2075,7 @@ class MonopolyCog(commands.Cog):
             )
             embed2.add_field(
                 name="🎲 Random Events",
-                value="The board is alive! Every time you roll the dice, there is a chance to trigger a Random Event. Some will bless your team with riches, while others will heavily sabotage your progress.",
+                value="Every time you roll the dice, there is a chance to trigger a Random Event. Some will bless your team, while others will sabotage you.",
                 inline=False
             )
             
@@ -2293,7 +2291,7 @@ class MonopolyCog(commands.Cog):
 
             cost = COST_MAP.get(house_count, 999_999_999)
 
-            # --- 💕 RING OF CHAROS CHECK ---
+            # --- <:charos:1558985798483837049> RING OF CHAROS CHECK ---
             has_charos = str(team_info.get("Ring of Charos", "no")).strip().lower() == "yes"
             if has_charos:
                 cost = cost // 2
@@ -2318,7 +2316,7 @@ class MonopolyCog(commands.Cog):
             charos_msg = ""
             if has_charos:
                 await asyncio.to_thread(self.consume_charos, team_name)
-                charos_msg = f"\n\n💕 *Your **Ring of Charos** charmed the real estate agent, securing a 50% discount! The ring shatters!*"
+                charos_msg = f"\n\n<:charos:1558985798483837049> *Your **Ring of Charos** charmed the real estate agent, securing a 50% discount! The ring shatters!*"
 
             buy_msg = f"<:houseicon:1438085020156821555> **{team_name}** bought a house on tile **{current_pos}** for **{cost:,} GP**!{charos_msg}"
             await interaction.followup.send(buy_msg)
@@ -2577,15 +2575,15 @@ class MonopolyCog(commands.Cog):
             display_name = "Protect Item Scroll" if card_name == "Protect Item" else ("Ring of Charos (a)" if card_name == "Ring of Charos" else card_name)
             
             if card_name == "Ring of Recoil":
-                card_emoji = "💍"
+                card_emoji = "<:recoil:1558985588055609374>"
             elif card_name == "Protect Item":
-                card_emoji = "<:inventory:1437979836881703074>"
+                card_emoji = "<:protect_item:1559003530050670632>"
             elif card_name == "Phoenix Necklace":
-                card_emoji = "<:pneck:1469359523989819392>"
+                card_emoji = "<:pneck:1558990483110367242>"
             elif card_name == "Ring of Charos":
-                card_emoji = "💕"
+                card_emoji = "<:charos:1558985798483837049>"
             elif card_name == "Ring of Stone":
-                card_emoji = "🪨"
+                card_emoji = "<:ring_of_stone:1558985677134241873>"
             else:
                 card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "🃏"))
             
@@ -2605,15 +2603,15 @@ class MonopolyCog(commands.Cog):
                 await team_channel.send(embed=embed)
                 
                 if card_name == "Protect Item":
-                    await team_channel.send(f"<:inventory:1437979836881703074> **{team_name}** drew a **Protect Item Scroll**!\nThe prayer is now **ACTIVE** in your inventory and will automatically block the next effect that steals your GP or cards!")
+                    await team_channel.send(f"<:protect_item:1559003530050670632> **{team_name}** drew a **Protect Item Scroll**!\nThe prayer is now **ACTIVE** in your inventory and will automatically block the next effect that steals your GP or cards!")
                 elif card_name == "Ring of Recoil":
-                    await team_channel.send(f"💍 **{team_name}** drew a **Ring of Recoil**!\nThe ring is now **ACTIVE** in your inventory and will force the next team that attacks you to suffer the same fate!")
+                    await team_channel.send(f"<:recoil:1558985588055609374> **{team_name}** drew a **Ring of Recoil**!\nThe ring is now **ACTIVE** in your inventory and will force the next team that attacks you to suffer the same fate!")
                 elif card_name == "Phoenix Necklace":
-                    await team_channel.send(f"<:pneck:1469359523989819392> **{team_name}** drew a **Phoenix Necklace**!\nThe necklace is now **ACTIVE** in your inventory and will absorb the next rent payment you owe!")
+                    await team_channel.send(f"<:pneck:1558990483110367242> **{team_name}** drew a **Phoenix Necklace**!\nThe necklace is now **ACTIVE** in your inventory and will absorb the next rent payment you owe!")
                 elif card_name == "Ring of Charos":
-                    await team_channel.send(f"💕 **{team_name}** drew a **Ring of Charos (a)**!\nThe ring is now **ACTIVE** in your inventory and will halve the cost of your next house purchase!")
+                    await team_channel.send(f"<:charos:1558985798483837049> **{team_name}** drew a **Ring of Charos (a)**!\nThe ring is now **ACTIVE** in your inventory and will halve the cost of your next house purchase!")
                 elif card_name == "Ring of Stone":
-                    await team_channel.send(f"🪨 **{team_name}** drew a **Ring of Stone**!\nThe ring is now **ACTIVE** in your inventory and will prevent the next card effect that tries to move or teleport you!")
+                    await team_channel.send(f"<:ring_of_stone:1558985677134241873> **{team_name}** drew a **Ring of Stone**!\nThe ring is now **ACTIVE** in your inventory and will prevent the next card effect that tries to move or teleport you!")
 
             else:
                 card_row_index = chosen_card["index"]
@@ -3153,11 +3151,11 @@ class MonopolyCog(commands.Cog):
                 print(f"❌ Error during roll protection check: {e}")
 
         if new_pos in CHEST_TILES:
-            print(f"📦 {team_name} triggered CHEST on tile {new_pos}")
+            print(f"<:chest:1558985858516787251> {team_name} triggered CHEST on tile {new_pos}")
             await self.team_receives_card(team_name, "Chest", team_channel)
             
         elif new_pos in CHANCE_TILES:
-            print(f"❓ {team_name} triggered CHANCE on tile {new_pos}")
+            print(f"<:chance:1558993615152353360> {team_name} triggered CHANCE on tile {new_pos}")
             await self.team_receives_card(team_name, "Chance", team_channel)
 
     @app_commands.command(name="cards", description="Show all cards currently held by your team.")
@@ -3201,19 +3199,19 @@ class MonopolyCog(commands.Cog):
 
         passives_text = ""
         if is_protected:
-            passives_text += "<:inventory:1437979836881703074> **Protect Item**\n*This prayer is active and will automatically block the next effect that steals your GP or cards.*\n\n"
+            passives_text += "<:protect_item:1559003530050670632> **Protect Item**\n*This prayer is active and will automatically block the next effect that steals your GP or cards.*\n\n"
         if has_recoil:
-            passives_text += "💍 **Ring of Recoil**\n*Speak of mutually assured destruction... Affects triggered on you are also triggered to the attacker.*\n\n"
+            passives_text += "<:recoil:1558985588055609374> **Ring of Recoil**\n*Speak of mutually assured destruction... Affects triggered on you are also triggered to the attacker.*\n\n"
         if has_phoenix:
-            passives_text += "<:pneck:1469359523989819392> **Phoenix Necklace**\n*This necklace will completely absorb the next rent payment you owe to another team before shattering.*\n\n"
+            passives_text += "<:pneck:1558990483110367242> **Phoenix Necklace**\n*This necklace will completely absorb the next rent payment you owe to another team before shattering.*\n\n"
         if has_charos:
-            passives_text += "💕 **Ring of Charos (a)**\n*This ring will automatically charm the real estate agent into giving you a 50% discount on your next house purchase.*\n\n"
+            passives_text += "<:charos:1558985798483837049> **Ring of Charos (a)**\n*This ring will automatically charm the real estate agent into giving you a 50% discount on your next house purchase.*\n\n"
         if has_stone:
-            passives_text += "🪨 **Ring of Stone**\n*This ring turns you into a heavy rock, preventing the next card effect that attempts to forcefully move or teleport you.*\n\n"
+            passives_text += "<:ring_of_stone:1558985677134241873> **Ring of Stone**\n*This ring turns you into a heavy rock, preventing the next card effect that attempts to forcefully move or teleport you.*\n\n"
 
         if passives_text:
             embed.add_field(
-                name="<:serverbooster:1406225321778348042> Passives <:serverbooster:1406225321778348042>",
+                name="<:passive:1558986754403336235> Passives <:passive:1558986754403336235>",
                 value=passives_text.strip(),
                 inline=False
             )
@@ -3221,7 +3219,7 @@ class MonopolyCog(commands.Cog):
         # --- CHEST CARDS SECTION ---
         if chest_cards:
             for i, card in enumerate(chest_cards, start=1):
-                emoji = CARD_EMOJIS.get(card['name'], "<:chest:1437979807362191441>")
+                emoji = CARD_EMOJIS.get(card['name'], "<:chest:1558985858516787251>")
                 embed.add_field(
                     name=f"{emoji} [{i}] Chest Card — {card['name']}",
                     value=f"```{card['text']}```",
@@ -3232,7 +3230,7 @@ class MonopolyCog(commands.Cog):
         offset = len(chest_cards)
         if chance_cards:
             for i, card in enumerate(chance_cards, start=1):
-                emoji = CARD_EMOJIS.get(card['name'], "<:questioning:1287623035381350441>")
+                emoji = CARD_EMOJIS.get(card['name'], "<:chance:1558993615152353360>")
                 embed.add_field(
                     name=f"{emoji} [{i+offset}] Chance Card — {card['name']}",
                     value=f"```{card['text']}```",
@@ -3285,7 +3283,7 @@ class MonopolyCog(commands.Cog):
 
             is_silenced = str(team_info.get("Silenced", "no")).strip().lower()
             if is_silenced == "yes":
-                await interaction.followup.send("❌ 🎭 **You are Silenced!** The Mime's aura prevents you from using any cards. You must roll the dice to break the silence.", ephemeral=True)
+                await interaction.followup.send("❌ <:mime:1559001543557251212> **You are Silenced!** The Mime's aura prevents you from using any cards. You must roll the dice to break the silence.", ephemeral=True)
                 return
             
             has_double_card = str(team_info.get("Double Card", "no")).strip().lower() == "yes"
@@ -3295,7 +3293,7 @@ class MonopolyCog(commands.Cog):
             
             if used_card_flag == "yes":
                 if has_double_card:
-                    double_card_note = "\n\n🧛🏻‍♀️ **Count Check says:** You have no card uses remaining this turn (bleeeh bleeeh!)."
+                    double_card_note = "\n\n<:count_check:1559005679656763452> **Count Check says:** You have no card uses remaining this turn (bleeeh bleeeh!)."
                     asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "Double Card"))
                 else:
                     await interaction.followup.send("❌ You can only use one card per turn. Roll again to use another card.", ephemeral=True)
@@ -3386,7 +3384,7 @@ class MonopolyCog(commands.Cog):
                 )
                 
                 is_status_activation = True
-                embed_description = "> <:maul:1437979898865258668> **Elder Maul Activated!** The next negative card effect used on your team will be reduced."
+                embed_description = "> <:eldermaul:1558986407735861359> **Elder Maul Activated!** The next negative card effect used on your team will be reduced."
 
             elif card_name == "Low Alchemy":
                 if team_wildcard_value == "active":
@@ -3485,23 +3483,23 @@ class MonopolyCog(commands.Cog):
                 
                 victim_channel = self.get_team_channel(target_team)
 
-                # --- 🛡️ PASSIVE CHECKS ---
+                # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
                 if await asyncio.to_thread(self.check_and_consume_redemption, target_team):
-                    embed_description = f"<:fishing:1437980297017688114> **{team_name}** tried to use **Lure** on **{target_team}**...\n\n<:redemption:1437979567900987493> But **{target_team}**'s Redemption activated!"
+                    embed_description = f"<:lure:1558986093796392960> **{team_name}** tried to use **Lure** on **{target_team}**...\n\n<:redemption:1558985458195898389> But **{target_team}**'s Redemption activated!"
                     if victim_channel:
-                        fizzle_embed = discord.Embed(title="<:redemption:1437979567900987493> Redemption Activated!", description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated!", color=discord.Color.blue())
+                        fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated!", color=discord.Color.blue())
                         await victim_channel.send(embed=fizzle_embed)
                         await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
                 
                 elif has_stone:
                     await self.consume_ring_of_stone(target_team)
-                    embed_description = f"<:fishing:1437980297017688114> **{team_name}** tried to use **Lure** on **{target_team}**...\n\n🪨 But **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be moved. The Lure failed!"
+                    embed_description = f"<:lure:1558986093796392960> **{team_name}** tried to use **Lure** on **{target_team}**...\n\n<:ring_of_stone:1558985677134241873> But **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be moved. The Lure failed!"
                     
                     stone_caster_embed = discord.Embed(
-                        title="🪨 Attack Blocked!", 
+                        title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
                         description=f"You tried to Lure **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be moved!\nYour attack failed and your card was wasted.", 
                         color=discord.Color.red()
                     )
@@ -3509,7 +3507,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                     if victim_channel:
-                        stone_embed = discord.Embed(title="🪨 Ring of Stone Activated!", description=f"**{team_name}** tried to **Lure** you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
+                        stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to **Lure** you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                         await victim_channel.send(embed=stone_embed)
                         await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                 
@@ -3526,7 +3524,7 @@ class MonopolyCog(commands.Cog):
                     source_tile_name = self.get_tile_name_for_display(target_pos)
                     destination_tile_name = self.get_tile_name_for_display(final_lure_pos)
                     embed_description = (
-                        f"<:fishing:1437980297017688114> **{target_team}** was lured from the "
+                        f"<:lure:1558986093796392960> **{target_team}** was lured from the "
                         f"**{source_tile_name}** tile (Tile **{target_pos}**) to your tile: the "
                         f"**{destination_tile_name}** tile (Tile **{final_lure_pos}**)!"
                     )
@@ -3536,7 +3534,7 @@ class MonopolyCog(commands.Cog):
                     
                         lure_embed = discord.Embed(
                     
-                            title="<:fishing:1437980297017688114> You Were Lured!",
+                            title="<:lure:1558986093796392960> You Were Lured!",
                     
                             description=(f"**{team_name}** used **Lure** and pulled your team to the **{self.get_tile_name_for_display(final_lure_pos)}** tile (Tile **{final_lure_pos}**)." + glider_note_victim),
                     
@@ -3556,7 +3554,7 @@ class MonopolyCog(commands.Cog):
             elif card_name == "Escape Crystal":
                 # 1. Teleblock Check
                 if self.get_teleblock_status(team_name) == "yes":
-                    await interaction.followup.send("<:teleblock:1438088930816819271> You are Teleblocked! You cannot use this card, even in jail!", ephemeral=True)
+                    await interaction.followup.send("<:teleblock:1558985901831364710> You are Teleblocked! You cannot use this card, even in jail!", ephemeral=True)
                     return 
 
                 # 2. Jail Status Check (The new guard clause)
@@ -3782,16 +3780,16 @@ class MonopolyCog(commands.Cog):
                 embed_description = ""
                 victim_channel = self.get_team_channel(target_team)
 
-                # --- 🛡️ PASSIVE CHECKS ---
+                # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
                 # 1. Check Redemption (Total Immunity)
                 if await asyncio.to_thread(self.check_and_consume_redemption, target_team):
-                    embed_description += f"> <:redemption:1437979567900987493> **{target_team}**'s Redemption activated. **Backstab** fizzled.\n"
+                    embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated. **Backstab** fizzled.\n"
                     if victim_channel:
                         fizzle_embed = discord.Embed(
-                            title="<:redemption:1437979567900987493> Redemption Activated!", 
+                            title="<:redemption:1558985458195898389> Redemption Activated!", 
                             description=f"**{team_name}** tried to use **Backstab** on you, but your **Redemption** activated!", 
                             color=discord.Color.blue()
                         )
@@ -3800,10 +3798,10 @@ class MonopolyCog(commands.Cog):
                 
                 elif has_stone:
                     await self.consume_ring_of_stone(target_team)
-                    embed_description += f"> 🪨 **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be moved. **Backstab** failed!\n"
+                    embed_description += f"> <:ring_of_stone:1558985677134241873> **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be moved. **Backstab** failed!\n"
                     
                     stone_caster_embed = discord.Embed(
-                        title="🪨 Attack Blocked!", 
+                        title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
                         description=f"You tried to Backstab **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be moved!\nYour attack failed and your card was wasted.", 
                         color=discord.Color.red()
                     )
@@ -3811,7 +3809,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                     if victim_channel:
-                        stone_embed = discord.Embed(title="🪨 Ring of Stone Activated!", description=f"**{team_name}** tried to **Backstab** you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
+                        stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to **Backstab** you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                         await victim_channel.send(embed=stone_embed)
                         await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                 
@@ -3820,7 +3818,7 @@ class MonopolyCog(commands.Cog):
                     elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name) 
                     
                     final_roll_val = (stored_roll // 2) if elder_maul_active else stored_roll
-                    maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
+                    maul_suffix = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if elder_maul_active else ""
                     
                     intended_rebound_pos = max(0, target_pos - final_roll_val)
                     new_pos = self.resolve_nonroll_landing_tile(intended_rebound_pos)
@@ -3831,7 +3829,7 @@ class MonopolyCog(commands.Cog):
                     await asyncio.to_thread(self.log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
                     
                     embed_description += (
-                        f"> <:venge:1438084953559797884> **{target_team}** had Vengeance! Your team was rebounded and dragged "
+                        f"> <:venge:1558986464409297077> **{target_team}** had Vengeance! Your team was rebounded and dragged "
                         f"**{final_roll_val}** tiles behind them to the **{destination_tile_name}** tile (Tile **{new_pos}**){maul_suffix}.\n"
                     )
                     embed_description += glider_note
@@ -3840,7 +3838,7 @@ class MonopolyCog(commands.Cog):
                     await self.auto_post_show_drops_if_boss_tile(team_name, new_pos)
                     
                     skull_embed = discord.Embed(
-                        title="<:venge:1438084953559797884> Vengeance Activated!", 
+                        title="<:venge:1558986464409297077> Vengeance Activated!", 
                         description=(f"You activated **{target_team}**'s Vengeance!\nYour team was dragged **{final_roll_val}** tiles behind them to the **{destination_tile_name}** tile (Tile **{new_pos}**)!" + glider_note_victim), 
                         color=discord.Color.dark_red()
                     )
@@ -3849,7 +3847,7 @@ class MonopolyCog(commands.Cog):
                     
                     if victim_channel:
                         victim_embed = discord.Embed(
-                            title="<:venge:1438084953559797884> Vengeance Activated!",
+                            title="<:venge:1558986464409297077> Vengeance Activated!",
                             description=(
                                 f"**{team_name}** tried to use **Backstab** on your team, but your **Vengeance** rebounded the effect!\n"
                                 f"They were dragged **{final_roll_val}** tiles behind your team to the **{destination_tile_name}** tile (Tile **{new_pos}**) (stops at Go)."
@@ -3865,7 +3863,7 @@ class MonopolyCog(commands.Cog):
                     elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
                     
                     final_roll_val = (stored_roll // 2) if elder_maul_active else stored_roll 
-                    maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
+                    maul_suffix = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if elder_maul_active else ""
                     
                     intended_backstab_pos = max(0, caster_pos - final_roll_val) 
                     new_pos = self.resolve_nonroll_landing_tile(intended_backstab_pos)
@@ -3887,7 +3885,7 @@ class MonopolyCog(commands.Cog):
                     
                     if victim_channel:
                         victim_embed = discord.Embed(
-                            title="<:boner:1438085053102948383> You Were Backstabbed!",
+                            title="<:boner:1558986033440489563> You Were Backstabbed!",
                             description=(
                                 f"**{team_name}** used **Backstab** on your team.\n"
                                 f"You were dragged from Tile **{target_pos}** to **{final_roll_val}** tiles behind them, landing on the **{destination_tile_name}** tile (Tile **{new_pos}**) (stops at Go){maul_suffix}."
@@ -3935,16 +3933,16 @@ class MonopolyCog(commands.Cog):
                 for target_team, target_pos in targets:
                     victim_channel = self.get_team_channel(target_team)
                     
-                    # --- 🛡️ PASSIVE CHECKS ---
+                    # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
                     victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                     has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
                     # 1. Check Redemption (Total Immunity)
                     if await asyncio.to_thread(self.check_and_consume_redemption, target_team):
-                        embed_description += f"> <:redemption:1437979567900987493> **{target_team}**'s Redemption activated. **Dragon Spear** fizzled.\n"
+                        embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated. **Dragon Spear** fizzled.\n"
                         if victim_channel:
                             fizzle_embed = discord.Embed(
-                                title="<:redemption:1437979567900987493> Redemption Activated!", 
+                                title="<:redemption:1558985458195898389> Redemption Activated!", 
                                 description=f"**{team_name}** tried to use **Dragon Spear** on you, but your **Redemption** activated!", 
                                 color=discord.Color.blue()
                             )
@@ -3954,10 +3952,10 @@ class MonopolyCog(commands.Cog):
                     
                     elif has_stone:
                         await self.consume_ring_of_stone(target_team)
-                        embed_description += f"> 🪨 **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be speared.\n"
+                        embed_description += f"> <:ring_of_stone:1558985677134241873> **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be speared.\n"
                         
                         stone_caster_embed = discord.Embed(
-                            title="🪨 Attack Blocked!", 
+                            title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
                             description=f"You tried to Dragon Spear **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be moved!", 
                             color=discord.Color.red()
                         )
@@ -3965,7 +3963,7 @@ class MonopolyCog(commands.Cog):
                         await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                         if victim_channel:
-                            stone_embed = discord.Embed(title="🪨 Ring of Stone Activated!", description=f"**{team_name}** tried to use a **Dragon Spear** on you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
+                            stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to use a **Dragon Spear** on you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                             await victim_channel.send(embed=stone_embed)
                             await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                         continue 
@@ -3975,7 +3973,7 @@ class MonopolyCog(commands.Cog):
                         elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name) 
                         
                         final_move_amount = -(stored_roll // 2) if elder_maul_active else move_amount
-                        maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
+                        maul_suffix = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if elder_maul_active else ""
                         
                         intended_pos_after_rebound = max(0, caster_pos + final_move_amount)
                         new_pos = self.resolve_nonroll_landing_tile(intended_pos_after_rebound)
@@ -3986,7 +3984,7 @@ class MonopolyCog(commands.Cog):
                         await asyncio.to_thread(self.log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
                         
                         embed_description += (
-                            f"> <:venge:1438084953559797884> **{target_team}** had Vengeance! Your team was moved back "
+                            f"> <:venge:1558986464409297077> **{target_team}** had Vengeance! Your team was moved back "
                             f"**{abs(final_move_amount)}** tiles to the **{destination_tile_name}** tile (Tile **{new_pos}**) "
                             f"(stops at Go){maul_suffix}.\n"
                         )
@@ -3996,7 +3994,7 @@ class MonopolyCog(commands.Cog):
                         await self.auto_post_show_drops_if_boss_tile(team_name, new_pos)
                         
                         skull_embed = discord.Embed(
-                            title="<:venge:1438084953559797884> Vengeance Activated!", 
+                            title="<:venge:1558986464409297077> Vengeance Activated!", 
                             description=(f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{abs(final_move_amount)}** spaces to the **{destination_tile_name}** tile (Tile **{new_pos}**)!" + glider_note_victim), 
                             color=discord.Color.dark_red()
                         )
@@ -4005,7 +4003,7 @@ class MonopolyCog(commands.Cog):
                         
                         if victim_channel:
                             victim_embed = discord.Embed(
-                                title="<:venge:1438084953559797884> Vengeance Activated!",
+                                title="<:venge:1558986464409297077> Vengeance Activated!",
                                 description=(
                                     f"**{team_name}** tried to use **Dragon Spear** on your team, but your **Vengeance** rebounded the effect!\n"
                                     f"They were moved back **{abs(final_move_amount)}** tiles to the **{destination_tile_name}** tile (Tile **{new_pos}**) (stops at Go)."
@@ -4022,7 +4020,7 @@ class MonopolyCog(commands.Cog):
                         elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
                         
                         final_move_amount = -(stored_roll // 2) if elder_maul_active else move_amount
-                        maul_suffix = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if elder_maul_active else ""
+                        maul_suffix = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if elder_maul_active else ""
                         
                         intended_target_pos = max(0, target_pos + final_move_amount)
                         new_pos = self.resolve_nonroll_landing_tile(intended_target_pos)
@@ -4040,7 +4038,7 @@ class MonopolyCog(commands.Cog):
                         
                         if victim_channel:
                             victim_embed = discord.Embed(
-                                title="<:dragonspear:1437980060567994399> You Were Hit by Dragon Spear!",
+                                title="<:dragon_spear:1558986141846347776> You Were Hit by Dragon Spear!",
                                 description=(
                                     f"**{team_name}** used **Dragon Spear** on your team.\n"
                                     f"You were moved back **{abs(final_move_amount)}** tiles to the **{self.get_tile_name_for_display(new_pos)}** tile (Tile **{new_pos}**) (stops at Go){maul_suffix}."
@@ -4054,7 +4052,7 @@ class MonopolyCog(commands.Cog):
             elif card_name == "Varrock Tele":
                 # Check Teleblock
                 if await asyncio.to_thread(self.get_teleblock_status, team_name) == "yes":
-                    await interaction.followup.send("<:teleblock:1438088930816819271> You are Teleblocked! You cannot use this card.", ephemeral=True)
+                    await interaction.followup.send("<:teleblock:1558985901831364710> You are Teleblocked! You cannot use this card.", ephemeral=True)
                     return 
 
                 all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
@@ -4126,7 +4124,7 @@ class MonopolyCog(commands.Cog):
 
             elif card_name == "Home Tele":
                 if self.get_teleblock_status(team_name) == "yes":
-                    await interaction.followup.send("<:teleblock:1438088930816819271> You are Teleblocked! You cannot use this card.", ephemeral=True)
+                    await interaction.followup.send("<:teleblock:1558985901831364710> You are Teleblocked! You cannot use this card.", ephemeral=True)
                     return 
 
                 all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
@@ -4230,30 +4228,30 @@ class MonopolyCog(commands.Cog):
                 victim_channel = self.get_team_channel(target_team)
                 embed_description = ""
 
-                # --- 🛡️ PASSIVE CHECKS ---
+                # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
                 if self.check_and_consume_vengeance(target_team):
-                    embed_description += f"> <:venge:1438084953559797884> **{target_team}** had Vengeance active! The teleport fizzled, and both cards were consumed."
+                    embed_description += f"> <:venge:1558986464409297077> **{target_team}** had Vengeance active! The teleport fizzled, and both cards were consumed."
                     if victim_channel:
-                        victim_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"**{team_name}** tried to use **Tele Other** on your team, but your **Vengeance** caused the teleport to fizzle.", color=discord.Color.dark_red())
+                        victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Tele Other** on your team, but your **Vengeance** caused the teleport to fizzle.", color=discord.Color.dark_red())
                         await victim_channel.send(embed=victim_embed)
                         await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                 
                 elif self.check_and_consume_redemption(target_team):
-                    embed_description += f"> <:redemption:1437979567900987493> **{target_team}**'s Redemption activated! The teleport was cancelled."
+                    embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated! The teleport was cancelled."
                     if victim_channel:
-                        fizzle_embed = discord.Embed(title="<:redemption:1437979567900987493> Redemption Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!", color=discord.Color.blue())
+                        fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!", color=discord.Color.blue())
                         await victim_channel.send(embed=fizzle_embed)
                         await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
                 
                 elif has_stone:
                     await self.consume_ring_of_stone(target_team)
-                    embed_description += f"> 🪨 **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be teleported. The spell failed!"
+                    embed_description += f"> <:ring_of_stone:1558985677134241873> **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be teleported. The spell failed!"
                     
                     stone_caster_embed = discord.Embed(
-                        title="🪨 Attack Blocked!", 
+                        title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
                         description=f"You tried to Tele Other **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be teleported!\nYour attack failed and your card was wasted.", 
                         color=discord.Color.red()
                     )
@@ -4261,7 +4259,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                     if victim_channel:
-                        stone_embed = discord.Embed(title="🪨 Ring of Stone Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
+                        stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                         await victim_channel.send(embed=stone_embed)
                         await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                 
@@ -4288,7 +4286,7 @@ class MonopolyCog(commands.Cog):
                     await loop.run_in_executor(None, self.log_command, team_name, "/card_effect_set_tile", {"team": target_team, "tile": target_final_pos})
 
                     if victim_channel:
-                        swap_embed = discord.Embed(title="<:teleother:1437980130407350375> You've Been Swapped!", description=(f"**{team_name}** used **Tele Other** and swapped places with your team!\nYour team is now on the **{target_dest_name}** tile (Tile **{target_final_pos}**)." + target_glider_note_victim), color=discord.Color.orange())
+                        swap_embed = discord.Embed(title="<:teleother:1558985957561213000> You've Been Swapped!", description=(f"**{team_name}** used **Tele Other** and swapped places with your team!\nYour team is now on the **{target_dest_name}** tile (Tile **{target_final_pos}**)." + target_glider_note_victim), color=discord.Color.orange())
                         await victim_channel.send(embed=swap_embed)
                         await self.mirror_to_game_log(victim_channel, embed=swap_embed)
 
@@ -4350,28 +4348,28 @@ class MonopolyCog(commands.Cog):
         if action == "tele_block":
             embed_color = discord.Color.dark_purple()
             if await asyncio.to_thread(self.check_and_consume_redemption, target_team):
-                embed_description += f"> <:redemption:1437979567900987493> **{target_team}**'s Redemption activated! The effect fizzled."
+                embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated! The effect fizzled."
                 if victim_channel:
-                    fizzle_embed = discord.Embed(title="<:redemption:1437979567900987493> Redemption Activated!", description=f"**{team_name}** tried to use **Tele Block** on you, but your **Redemption** activated!", color=discord.Color.blue())
+                    fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Tele Block** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
                     await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
-                embed_description += f"> <:venge:1438084953559797884> **{target_team}** had Vengeance! The effect rebounded, and your team is now **Teleblocked**."
+                embed_description += f"> <:venge:1558986464409297077> **{target_team}** had Vengeance! The effect rebounded, and your team is now **Teleblocked**."
                 await asyncio.to_thread(self.set_teleblock_status, team_name, "yes") 
-                skull_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYour team is now **Teleblocked**!", color=discord.Color.dark_red())
+                skull_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYour team is now **Teleblocked**!", color=discord.Color.dark_red())
                 await interaction.channel.send(embed=skull_embed)
                 await self.mirror_to_game_log(interaction.channel, embed=skull_embed) 
                 if victim_channel:
-                    victim_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"**{team_name}** tried to use **Tele Block** on your team, but your **Vengeance** rebounded the effect and **Teleblocked** them instead!", color=discord.Color.dark_red())
+                    victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Tele Block** on your team, but your **Vengeance** rebounded the effect and **Teleblocked** them instead!", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
                     await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             else:
-                embed_description += f"> <:teleblock:1438088930816819271> **{target_team}** is now **Teleblocked** until after their next roll."
+                embed_description += f"> <:teleblock:1558985901831364710> **{target_team}** is now **Teleblocked** until after their next roll."
                 await asyncio.to_thread(self.set_teleblock_status, target_team, "yes") 
                 if victim_channel:
-                    tb_embed = discord.Embed(title="<:teleblock:1438088930816819271> You are Teleblocked!", description=f"**{team_name}** used **Tele Block** on your team! You cannot use teleport cards until after your next roll.", color=discord.Color.dark_purple())
+                    tb_embed = discord.Embed(title="<:teleblock:1558985901831364710> You are Teleblocked!", description=f"**{team_name}** used **Tele Block** on your team! You cannot use teleport cards until after your next roll.", color=discord.Color.dark_purple())
                     await victim_channel.send(embed=tb_embed)
                     await self.mirror_to_game_log(victim_channel, embed=tb_embed)
 
@@ -4382,10 +4380,10 @@ class MonopolyCog(commands.Cog):
             target_cards = [c for c in stealable_cards if c["victim_team"] == victim_team]
             
             if not target_cards:
-                embed_description = f"<:rogue_gloves:1437980096790134914> **{team_name}** tried to pick **{victim_team}**'s pocket, but they have no removable items left!"
+                embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to pick **{victim_team}**'s pocket, but they have no removable items left!"
                 if victim_channel:
                     fail_embed = discord.Embed(
-                        title="<:rogue_gloves:1437980096790134914> Rogue's Gloves Failed",
+                        title="<:roguegloves:1558986623486660648> Rogue's Gloves Failed",
                         description=f"**{team_name}** tried to steal from you, but you have no cards left to take!",
                         color=discord.Color.blue()
                     )
@@ -4393,7 +4391,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 return
 
-            # --- 🛡️ PASSIVE CHECKS ---
+            # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
             team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             victim_info = next((r for r in team_records if r.get("Team") == victim_team), {})
             has_protect = str(victim_info.get("Protect Item", "no")).strip().lower() == "yes"
@@ -4401,10 +4399,10 @@ class MonopolyCog(commands.Cog):
 
             if has_protect:
                 await self.consume_protect_item(victim_team)
-                embed_description = f"<:rogue_gloves:1437980096790134914> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:inventory:1437979836881703074> But **{victim_team}**'s Protect Item prayer activated! The steal was blocked."
+                embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:protect_item:1559003530050670632> But **{victim_team}**'s Protect Item prayer activated! The steal was blocked."
                 
                 protect_caster_embed = discord.Embed(
-                    title="<:inventory:1437979836881703074> Attack Blocked!", 
+                    title="<:protect_item:1559003530050670632> Attack Blocked!", 
                     description=f"You tried to use Rogue's Gloves on **{victim_team}**, but their **Protect Item** prayer was active!\nYour attack failed and your card was wasted.", 
                     color=discord.Color.red()
                 )
@@ -4413,7 +4411,7 @@ class MonopolyCog(commands.Cog):
 
                 if victim_channel:
                     protect_embed = discord.Embed(
-                        title="<:inventory:1437979836881703074> Protect Item Activated!",
+                        title="<:protect_item:1559003530050670632> Protect Item Activated!",
                         description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Protect Item** prayer saved your card!",
                         color=discord.Color.blue()
                     )
@@ -4421,10 +4419,10 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=protect_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_redemption, victim_team):
-                embed_description = f"<:rogue_gloves:1437980096790134914> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:redemption:1437979567900987493> But **{victim_team}**'s Redemption activated!"
+                embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:redemption:1558985458195898389> But **{victim_team}**'s Redemption activated!"
                 if victim_channel:
                     fizzle_embed = discord.Embed(
-                        title="<:redemption:1437979567900987493> Redemption Activated!",
+                        title="<:redemption:1558985458195898389> Redemption Activated!",
                         description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Redemption** activated!",
                         color=discord.Color.blue()
                     )
@@ -4432,7 +4430,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_vengeance, victim_team):
-                embed_description = f"<:rogue_gloves:1437980096790134914> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:venge:1438084953559797884> **{victim_team}** had Vengeance! The effect was rebounded!\n"
+                embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:venge:1558986464409297077> **{victim_team}** had Vengeance! The effect was rebounded!\n"
 
                 caster_chest_cards = self.get_held_cards(self.chest_sheet, team_name)
                 caster_chance_cards = self.get_held_cards(self.chance_sheet, team_name)
@@ -4473,7 +4471,7 @@ class MonopolyCog(commands.Cog):
                         rebound_sheet.update_cell(rebound_row, 4, json.dumps(wildcard_data_json_rebound))
                     except: pass
 
-                    embed_description += f"<:rogue_gloves:1437980096790134914> The steal rebounded! **{victim_team}** stole **{stolen_from_caster_name}** from **{team_name}** instead."
+                    embed_description += f"<:roguegloves:1558986623486660648> The steal rebounded! **{victim_team}** stole **{stolen_from_caster_name}** from **{team_name}** instead."
 
                 else:
                     stolen_from_caster_name = "Rogue's Gloves"
@@ -4492,14 +4490,14 @@ class MonopolyCog(commands.Cog):
                         card_sheet.update_cell(card_row, 4, json.dumps(wildcard_data_json_rg))
                     except: pass
 
-                    embed_description += f"<:rogue_gloves:1437980096790134914> The steal rebounded! **{victim_team}** stole the **Rogue's Gloves** card from **{team_name}**!"
+                    embed_description += f"<:roguegloves:1558986623486660648> The steal rebounded! **{victim_team}** stole the **Rogue's Gloves** card from **{team_name}**!"
 
-                skull_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nThey stole your **{stolen_from_caster_name}** card!", color=discord.Color.dark_red())
+                skull_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nThey stole your **{stolen_from_caster_name}** card!", color=discord.Color.dark_red())
                 await interaction.channel.send(embed=skull_embed)
                 await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
 
                 if victim_channel:
-                    victim_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Vengeance** rebounded the effect!\nYou stole **{stolen_from_caster_name}** from their team.", color=discord.Color.dark_red())
+                    victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Vengeance** rebounded the effect!\nYou stole **{stolen_from_caster_name}** from their team.", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
                     await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                 
@@ -4518,9 +4516,9 @@ class MonopolyCog(commands.Cog):
                 ]
                 
                 if not other_caster_cards:
-                    embed_description += f"> 💍 **{victim_team}** has a **Ring of Recoil**! The Steal failed because **{team_name}** has no other cards to lose to the recoil."
+                    embed_description += f"> <:recoil:1558985588055609374> **{victim_team}** has a **Ring of Recoil**! The Steal failed because **{team_name}** has no other cards to lose to the recoil."
                     if victim_channel:
-                        fail_embed = discord.Embed(title="🛡️ Attack Failed!", description=f"**{team_name}** tried to steal from you, but the attack failed due to a lack of cards for the **Ring of Recoil** penalty.", color=discord.Color.blue())
+                        fail_embed = discord.Embed(title="<:defence:1559009393884925952> Attack Failed!", description=f"**{team_name}** tried to steal from you, but the attack failed due to a lack of cards for the **Ring of Recoil** penalty.", color=discord.Color.blue())
                         await victim_channel.send(embed=fail_embed)
                         await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 else:
@@ -4543,10 +4541,10 @@ class MonopolyCog(commands.Cog):
                         c_sheet.update_cell(c_row, 4, json.dumps(c_wild_data))
                     except: pass
 
-                    embed_description += f"> 💍 **Recoil Triggered!** **{team_name}** tried to steal, but the ring blocked it and forced them to give up a card! **{victim_team}** got **{stolen_from_caster['name']}**!"
+                    embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** **{team_name}** tried to steal, but the ring blocked it and forced them to give up a card! **{victim_team}** got **{stolen_from_caster['name']}**!"
                     
                     recoil_caster_embed = discord.Embed(
-                        title="💍 Recoil Activated!", 
+                        title="<:recoil:1558985588055609374> Recoil Activated!", 
                         description=f"You attacked a team wearing a **Ring of Recoil**!\nYour steal was blocked, and the recoil forced you to give them a card!\n\n🔴 You lost **{stolen_from_caster['name']}**.", 
                         color=discord.Color.dark_red()
                     )
@@ -4555,7 +4553,7 @@ class MonopolyCog(commands.Cog):
 
                     if victim_channel:
                         victim_embed = discord.Embed(
-                            title="💍 Recoil Shattered!", 
+                            title="<:recoil:1558985588055609374> Recoil Shattered!", 
                             description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Ring of Recoil** triggered! It blocked the steal and forced them to surrender a card!\n\n🟢 You received **{stolen_from_caster['name']}**.", 
                             color=discord.Color.green()
                         )
@@ -4581,7 +4579,7 @@ class MonopolyCog(commands.Cog):
                     target_sheet.update_cell(target_row, 4, json.dumps(wildcard_data_json))
                 except: pass
 
-                embed_description = f"<:rogue_gloves:1437980096790134914> **{team_name}** used **Rogue's Gloves** and stole **{stolen_card['card_name']}** from **{victim_team}**!"
+                embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** used **Rogue's Gloves** and stole **{stolen_card['card_name']}** from **{victim_team}**!"
                 
                 if victim_channel:
                     victim_embed = discord.Embed(
@@ -4607,16 +4605,16 @@ class MonopolyCog(commands.Cog):
             target_row_idx = all_teams_data.index(target_record) + 2
             caster_row_idx = all_teams_data.index(caster_record) + 2
 
-            # --- 🛡️ PASSIVE CHECKS ---
+            # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
             has_protect = str(target_record.get("Protect Item", "no")).strip().lower() == "yes"
             has_recoil = str(target_record.get("Ring of Recoil", "no")).strip().lower() == "yes"
 
             if has_protect:
                 await self.consume_protect_item(target_team)
-                embed_description += f"> <:inventory:1437979836881703074> **{target_team}**'s Protect Item prayer activated! The Pickpocket was blocked."
+                embed_description += f"> <:protect_item:1559003530050670632> **{target_team}**'s Protect Item prayer activated! The Pickpocket was blocked."
                 
                 protect_caster_embed = discord.Embed(
-                    title="<:inventory:1437979836881703074> Attack Blocked!", 
+                    title="<:protect_item:1559003530050670632> Attack Blocked!", 
                     description=f"You tried to Pickpocket **{target_team}**, but their **Protect Item** prayer was active!\nYour attack failed and your card was wasted.", 
                     color=discord.Color.red()
                 )
@@ -4625,7 +4623,7 @@ class MonopolyCog(commands.Cog):
 
                 if victim_channel:
                     protect_embed = discord.Embed(
-                        title="<:inventory:1437979836881703074> Protect Item Activated!", 
+                        title="<:protect_item:1559003530050670632> Protect Item Activated!", 
                         description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Protect Item** prayer saved your GP!", 
                         color=discord.Color.blue()
                     )
@@ -4633,16 +4631,16 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=protect_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_redemption, target_team):
-                embed_description += f"> <:redemption:1437979567900987493> **{target_team}**'s Redemption activated! The Pickpocket fizzled."
+                embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated! The Pickpocket fizzled."
                 if victim_channel:
-                    fizzle_embed = discord.Embed(title="<:redemption:1437979567900987493> Redemption Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Redemption** activated!", color=discord.Color.blue())
+                    fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
                     await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
                 base_percent = 0.20
                 maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name)
-                maul_note = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if maul_active else ""
+                maul_note = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if maul_active else ""
                 
                 steal_amount = max(1, int(caster_gp * (0.10 if maul_active else base_percent)))
                 new_caster_gp = max(0, caster_gp - steal_amount)
@@ -4651,24 +4649,24 @@ class MonopolyCog(commands.Cog):
                 self.team_data_sheet.update_cell(caster_row_idx, gp_col_idx, new_caster_gp)
                 self.team_data_sheet.update_cell(target_row_idx, gp_col_idx, new_target_gp)
 
-                embed_description += f"> <:venge:1438084953559797884> **{target_team}** had Vengeance! They stole **{steal_amount:,} GP** from **{team_name}** instead!{maul_note}"
+                embed_description += f"> <:venge:1558986464409297077> **{target_team}** had Vengeance! They stole **{steal_amount:,} GP** from **{team_name}** instead!{maul_note}"
 
                 if victim_channel:
-                    victim_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Vengeance** rebounded it! You stole **{steal_amount:,} GP** from them!{maul_note}", color=discord.Color.green())
+                    victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Vengeance** rebounded it! You stole **{steal_amount:,} GP** from them!{maul_note}", color=discord.Color.green())
                     await victim_channel.send(embed=victim_embed)
                     await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             elif has_recoil:
                 base_percent = 0.20
                 maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
-                maul_note = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if maul_active else ""
+                maul_note = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if maul_active else ""
                 
                 steal_amount = max(1, int(highest_gp * (0.10 if maul_active else base_percent)))
                 
                 if caster_gp < steal_amount:
-                    embed_description += f"> 💍 **{target_team}** has a **Ring of Recoil**! The Pickpocket failed because **{team_name}** did not have enough GP to afford the recoil damage."
+                    embed_description += f"> <:recoil:1558985588055609374> **{target_team}** has a **Ring of Recoil**! The Pickpocket failed because **{team_name}** did not have enough GP to afford the recoil damage."
                     if victim_channel:
-                        fail_embed = discord.Embed(title="🛡️ Attack Failed!", description=f"**{team_name}** tried to Pickpocket you, but couldn't survive your **Ring of Recoil**!", color=discord.Color.blue())
+                        fail_embed = discord.Embed(title="<:defence:1559009393884925952> Attack Failed!", description=f"**{team_name}** tried to Pickpocket you, but couldn't survive your **Ring of Recoil**!", color=discord.Color.blue())
                         await victim_channel.send(embed=fail_embed)
                         await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 else:
@@ -4679,10 +4677,10 @@ class MonopolyCog(commands.Cog):
                     self.team_data_sheet.update_cell(target_row_idx, gp_col_idx, new_target_gp)
                     self.team_data_sheet.update_cell(caster_row_idx, gp_col_idx, new_caster_gp)
 
-                    embed_description += f"> 💍 **Recoil Triggered!** Both **{team_name}** and **{target_team}** lost **{steal_amount:,} GP**!{maul_note}"
+                    embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** Both **{team_name}** and **{target_team}** lost **{steal_amount:,} GP**!{maul_note}"
 
                     recoil_caster_embed = discord.Embed(
-                        title="💍 Recoil Activated!", 
+                        title="<:recoil:1558985588055609374> Recoil Activated!", 
                         description=f"You attacked a team wearing a **Ring of Recoil**!\nBoth your team and **{target_team}** lost **{steal_amount:,} GP**!{maul_note}", 
                         color=discord.Color.dark_red()
                     )
@@ -4690,14 +4688,14 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(interaction.channel, embed=recoil_caster_embed)
 
                     if victim_channel:
-                        victim_embed = discord.Embed(title="💍 Recoil Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Ring of Recoil** triggered! Both teams lost **{steal_amount:,} GP**!{maul_note}", color=discord.Color.green())
+                        victim_embed = discord.Embed(title="<:recoil:1558985588055609374> Recoil Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Ring of Recoil** triggered! Both teams lost **{steal_amount:,} GP**!{maul_note}", color=discord.Color.green())
                         await victim_channel.send(embed=victim_embed)
                         await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             else:
                 base_percent = 0.20
                 maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
-                maul_note = " (Halved by <:maul:1437979898865258668> **Elder Maul**!)" if maul_active else ""
+                maul_note = " (Halved by <:eldermaul:1558986407735861359> **Elder Maul**!)" if maul_active else ""
                 
                 steal_amount = max(1, int(highest_gp * (0.10 if maul_active else base_percent)))
                 new_target_gp = max(0, highest_gp - steal_amount)
@@ -4709,9 +4707,9 @@ class MonopolyCog(commands.Cog):
                 embed_description += f"> Stole **{steal_amount:,} GP** from **{target_team}**!{maul_note}"
 
                 if victim_channel:
-                    maul_msg = "\n\n🛡️ Your **Elder Maul** activated and halved the losses!" if maul_active else ""
+                    maul_msg = "\n\n<:defence:1559009393884925952> Your **Elder Maul** activated and halved the losses!" if maul_active else ""
                     victim_embed = discord.Embed(
-                        title="💸 Pickpocketed!",
+                        title="<:pickpocket:1558986509242212412> Pickpocketed!",
                         description=f"**{team_name}** used **Pickpocket** and stole **{steal_amount:,} GP** from your team.{maul_msg}",
                         color=discord.Color.dark_red() if not maul_active else discord.Color.blue()
                     )
@@ -4728,10 +4726,10 @@ class MonopolyCog(commands.Cog):
             non_active_cards = [card for card in all_victim_cards if "(ACTIVE)" not in card['text']]
 
             if not non_active_cards:
-                embed_description = f"<:smite:1437979867084881950> **{team_name}** tried to Smite **{victim_team}**, but they have no removable cards left!"
+                embed_description = f"<:smite:1558986008404697199> **{team_name}** tried to Smite **{victim_team}**, but they have no removable cards left!"
                 if victim_channel:
                     fail_embed = discord.Embed(
-                        title="🛡️ Smite Failed!",
+                        title="<:defence:1559009393884925952> Smite Failed!",
                         description=f"**{team_name}** tried to Smite you, but you have no cards to lose!",
                         color=discord.Color.blue()
                     )
@@ -4739,7 +4737,7 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 return  
 
-            # --- 🛡️ PASSIVE CHECKS ---
+            # --- <:defence:1559009393884925952> PASSIVE CHECKS ---
             team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
             victim_info = next((r for r in team_records if r.get("Team") == victim_team), {})
             has_protect = str(victim_info.get("Protect Item", "no")).strip().lower() == "yes"
@@ -4747,10 +4745,10 @@ class MonopolyCog(commands.Cog):
 
             if has_protect:
                 await self.consume_protect_item(victim_team)
-                embed_description += f"> <:inventory:1437979836881703074> **{victim_team}**'s Protect Item prayer activated! The Smite was blocked."
+                embed_description += f"> <:protect_item:1559003530050670632> **{victim_team}**'s Protect Item prayer activated! The Smite was blocked."
                 
                 protect_caster_embed = discord.Embed(
-                    title="<:inventory:1437979836881703074> Attack Blocked!", 
+                    title="<:protect_item:1559003530050670632> Attack Blocked!", 
                     description=f"You tried to Smite **{victim_team}**, but their **Protect Item** prayer was active!\nYour attack failed and your card was wasted.", 
                     color=discord.Color.red()
                 )
@@ -4759,7 +4757,7 @@ class MonopolyCog(commands.Cog):
 
                 if victim_channel:
                     protect_embed = discord.Embed(
-                        title="<:inventory:1437979836881703074> Protect Item Activated!", 
+                        title="<:protect_item:1559003530050670632> Protect Item Activated!", 
                         description=f"**{team_name}** tried to use **Smite** on you, but your **Protect Item** prayer saved your inventory!", 
                         color=discord.Color.blue()
                     )
@@ -4767,14 +4765,14 @@ class MonopolyCog(commands.Cog):
                     await self.mirror_to_game_log(victim_channel, embed=protect_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_redemption, victim_team):
-                embed_description += f"> <:redemption:1437979567900987493> **{victim_team}**'s Redemption activated!"
+                embed_description += f"> <:redemption:1558985458195898389> **{victim_team}**'s Redemption activated!"
                 if victim_channel:
-                    fizzle_embed = discord.Embed(title="<:redemption:1437979567900987493> Redemption Activated!", description=f"**{team_name}** tried to use **Smite** on you, but your **Redemption** activated!", color=discord.Color.blue())
+                    fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Smite** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
                     await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
             
             elif await asyncio.to_thread(self.check_and_consume_vengeance, victim_team):
-                embed_description += f"> <:venge:1438084953559797884> **{victim_team}** had Vengeance! The effect rebounded.\n> "
+                embed_description += f"> <:venge:1558986464409297077> **{victim_team}** had Vengeance! The effect rebounded.\n> "
                 
                 caster_chest_cards = self.get_held_cards(self.chest_sheet, team_name)
                 caster_chance_cards = self.get_held_cards(self.chance_sheet, team_name)
@@ -4785,7 +4783,7 @@ class MonopolyCog(commands.Cog):
                     embed_description += f"**{team_name}** had no cards to lose."
                     if victim_channel:
                         victim_embed = discord.Embed(
-                            title="<:venge:1438084953559797884> Vengeance Activated!",
+                            title="<:venge:1558986464409297077> Vengeance Activated!",
                             description=f"**{team_name}** tried to use **Smite** on your team, but your **Vengeance** rebounded the effect!\nThey had no removable cards to lose.",
                             color=discord.Color.dark_red()
                         )
@@ -4810,13 +4808,13 @@ class MonopolyCog(commands.Cog):
                     
                     embed_description += f"**{team_name}** lost their **{card_to_remove['name']}** card."
                     
-                    skull_embed = discord.Embed(title="<:venge:1438084953559797884> Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nYou lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
+                    skull_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nYou lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
                     await interaction.channel.send(embed=skull_embed)
                     await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
                     
                     if victim_channel:
                         victim_embed = discord.Embed(
-                            title="<:venge:1438084953559797884> Vengeance Activated!",
+                            title="<:venge:1558986464409297077> Vengeance Activated!",
                             description=f"**{team_name}** tried to use **Smite** on your team, but your **Vengeance** rebounded the effect!\nThey lost their **{card_to_remove['name']}** card.",
                             color=discord.Color.dark_red()
                         )
@@ -4838,9 +4836,9 @@ class MonopolyCog(commands.Cog):
                 ]
                 
                 if not other_caster_cards or not non_active_cards:
-                    embed_description += f"> 💍 **{victim_team}** has a **Ring of Recoil**! The Smite failed because one team has no removable cards for the recoil destruction."
+                    embed_description += f"> <:recoil:1558985588055609374> **{victim_team}** has a **Ring of Recoil**! The Smite failed because one team has no removable cards for the recoil destruction."
                     if victim_channel:
-                        fail_embed = discord.Embed(title="🛡️ Attack Failed!", description=f"**{team_name}** tried to Smite you, but the attack failed due to a lack of cards for the **Ring of Recoil** swap.", color=discord.Color.blue())
+                        fail_embed = discord.Embed(title="<:defence:1559009393884925952> Attack Failed!", description=f"**{team_name}** tried to Smite you, but the attack failed due to a lack of cards for the **Ring of Recoil** swap.", color=discord.Color.blue())
                         await victim_channel.send(embed=fail_embed)
                         await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 else:
@@ -4878,10 +4876,10 @@ class MonopolyCog(commands.Cog):
                     if team_name in c_teams: c_teams.remove(team_name)
                     c_sheet.update_cell(c_row, 3, ", ".join(c_teams))
 
-                    embed_description += f"> 💍 **Recoil Triggered!** Both **{team_name}** and **{victim_team}** lost a card! (**{caster_card['name']}** and **{target_card['name']}**)"
+                    embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** Both **{team_name}** and **{victim_team}** lost a card! (**{caster_card['name']}** and **{target_card['name']}**)"
                     
                     recoil_caster_embed = discord.Embed(
-                        title="💍 Recoil Activated!", 
+                        title="<:recoil:1558985588055609374> Recoil Activated!", 
                         description=f"You attacked a team wearing a **Ring of Recoil**!\nBoth your team and **{victim_team}** lost a card!\n\n🔴 You lost **{caster_card['name']}**.\n🟢 They lost **{target_card['name']}**.", 
                         color=discord.Color.dark_red()
                     )
@@ -4890,7 +4888,7 @@ class MonopolyCog(commands.Cog):
 
                     if victim_channel:
                         victim_embed = discord.Embed(
-                            title="💍 Recoil Shattered!", 
+                            title="<:recoil:1558985588055609374> Recoil Shattered!", 
                             description=f"**{team_name}** tried to use **Smite** on you, but your **Ring of Recoil** triggered! Both teams lost a card!\n\n🔴 You lost **{target_card['name']}**.\n🟢 They lost **{caster_card['name']}**.", 
                             color=discord.Color.green()
                         )
@@ -5017,32 +5015,32 @@ class MonopolyCog(commands.Cog):
                     has_protect = str(team_info.get("Protect Item", "no")).strip().lower() == "yes"
                     if has_protect:
                         await self.consume_protect_item(chosen_team)
-                        embed_desc = f"🍺 **The Drunken Dwarf!**\n*\"Have a kebab, mate!\"* The dwarf tries to force **{chosen_team}** to pay his massive bar tab, but their <:inventory:1437979836881703074> **Protect Item** prayer activates! The prayer is drained, but their GP is perfectly safe!"
+                        embed_desc = f"<:drunken_dwarf:1558999600323629116> **The Drunken Dwarf!**\n*\"Have a kebab, mate!\"* The dwarf tries to force **{chosen_team}** to pay his massive bar tab, but their <:protect_item:1559003530050670632> **Protect Item** prayer activates! The prayer is drained, but their GP is perfectly safe!"
                     else:
                         fine = int(current_gp * 0.20)
                         await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp - fine)
-                        embed_desc = f"🍺 **The Drunken Dwarf!**\n*\"Have a kebab, mate!\"* The dwarf corners **{chosen_team}** and forces them to pay his massive bar tab! They lose **20%** of their total wealth (**{fine:,} GP**)!"
+                        embed_desc = f"<:drunken_dwarf:1558999600323629116> **The Drunken Dwarf!**\n*\"Have a kebab, mate!\"* The dwarf corners **{chosen_team}** and forces them to pay his massive bar tab! They lose **20%** of their total wealth (**{fine:,} GP**)!"
                 
                 elif chosen_nerf == "ents":
                     col = headers.index("GP Halved") + 1 if "GP Halved" in headers else -1
                     if col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"🌳 **The Ents!**\nAn ent grew and shakes **{chosen_team}** upside down! **All GP earned is cut in half** until their next roll!"
+                    embed_desc = f"<:ent:1558999589317640262> **The Ents!**\nAn ent grows and shakes **{chosen_team}** upside down! **All GP earned is cut in half** until their next roll!"
 
                 elif chosen_nerf == "gravedigger":
                     col = headers.index("Roll Penalty") + 1
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"🪦 **Leo the Gravedigger!**\n*\"Give me a hand with these coffins!\"* **{chosen_team}** is exhausted from digging graves! Their next dice roll is reduced by **3**!"
+                    embed_desc = f"<:leo:1558999609601294346> **Leo the Gravedigger!**\n*\"Give me a hand with these coffins!\"* **{chosen_team}** is exhausted from digging graves! Their next dice roll is reduced by **3**!"
                 
                 elif chosen_nerf == "plant":
                     col = headers.index("Poisoned Roll") + 1
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"🥀 **The Strange Plant!**\n*It lashes out with poisonous vines!* **{chosen_team}** has been poisoned! Their next dice roll cannot exceed **3**!"
+                    embed_desc = f"<:strange_plant:1558995237098094602> **The Strange Plant!**\n*It lashes out with poisonous vines!* **{chosen_team}** has been poisoned! Their next dice roll cannot exceed **3**!"
                 
                 elif chosen_nerf == "twin":
                     has_protect = str(team_info.get("Protect Item", "no")).strip().lower() == "yes"
                     if has_protect:
                         await self.consume_protect_item(chosen_team)
-                        embed_desc = f"👯 **The Evil Twin!**\nMolly's evil twin attempts to frame **{chosen_team}** and confiscate a card, but their <:inventory:1437979836881703074> **Protect Item** prayer activates! The prayer is drained, keeping their inventory safe!"
+                        embed_desc = f"<:molly:1558999622100320347> **The Evil Twin!**\nMolly's evil twin attempts to confiscate a card from **{chosen_team}**, but their <:protect_item:1559003530050670632> **Protect Item** prayer activates! The prayer is drained, keeping their inventory safe!"
                     else:
                         all_chance = await asyncio.to_thread(self.chance_sheet.get_all_records)
                         all_chest = await asyncio.to_thread(self.chest_sheet.get_all_records)
@@ -5057,9 +5055,9 @@ class MonopolyCog(commands.Cog):
                             current_holders = [t.strip() for t in str(stolen_card["data"].get("Held By Team", "")).split(",") if t.strip()]
                             current_holders.remove(chosen_team)
                             await asyncio.to_thread(stolen_card["sheet"].update_cell, stolen_card["row"], 3, ", ".join(current_holders))
-                            embed_desc = f"👯 **The Evil Twin!**\n*\"You're coming with me!\"* Molly's evil twin frames **{chosen_team}**! The authorities confiscate their **{stolen_card['data'].get('Name')}** card!"
+                            embed_desc = f"<:molly:1558999622100320347> **The Evil Twin!**\n*\"Gotcha!\"* Molly's evil twin corners **{chosen_team}** and confiscates their **{stolen_card['data'].get('Name')}** card!"
                         else:
-                            embed_desc = f"👯 **The Evil Twin!**\nMolly's evil twin tries to frame **{chosen_team}**, but they have no proof! They escape unharmed."
+                            embed_desc = f"<:molly:1558999622100320347> **The Evil Twin!**\nMolly's evil twin tries to steal from **{chosen_team}**, but she was caught!"
                 
                 elif chosen_nerf == "whirlpool":
                     spaces_back = random.randint(2, 4)
@@ -5069,7 +5067,7 @@ class MonopolyCog(commands.Cog):
                     if pos_col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, pos_col, new_pos)
                     if new_pos == 0: await asyncio.to_thread(self.increment_rolls_available, chosen_team)
                     await asyncio.to_thread(self.log_command, chosen_team, "/card_effect_set_tile", {"team": chosen_team, "tile": new_pos})
-                    embed_desc = f"🌀 **The Whirlpool!**\nA sudden whirlpool sucks **{chosen_team}** under! They wash up **{spaces_back}** spaces backwards on Tile **{new_pos}**!"
+                    embed_desc = f"<:whirlpool:1558998111253299323> **The Whirlpool!**\nA sudden whirlpool sucks **{chosen_team}** under! They wash up **{spaces_back}** spaces backwards on Tile **{new_pos}**!"
                     if new_pos == 0: embed_desc += "\n\n🎯 **BULLSEYE!** Washing up perfectly on GO grants a **Free Roll**!"
 
                 elif chosen_nerf == "sandwich":
@@ -5079,13 +5077,13 @@ class MonopolyCog(commands.Cog):
                     if pos_col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, pos_col, new_pos)
                     if new_pos == 0: await asyncio.to_thread(self.increment_rolls_available, chosen_team)
                     await asyncio.to_thread(self.log_command, chosen_team, "/card_effect_set_tile", {"team": chosen_team, "tile": new_pos})
-                    embed_desc = f"🥖 **The Sandwich Lady!**\n*\"You picked the wrong sandwich!\"* She whacks **{chosen_team}** with a stale baguette! They are knocked **{spaces_back}** tiles backwards to Tile **{new_pos}**!"
+                    embed_desc = f"<:sandwich_lady:1558999634096037898> **The Sandwich Lady!**\n*\"You picked the wrong sandwich!\"* She whacks **{chosen_team}** with a stale baguette! They are knocked **{spaces_back}** tiles backwards to Tile **{new_pos}**!"
                     if new_pos == 0: embed_desc += "\n\n🎯 **BULLSEYE!** Landing perfectly on GO via baguette whack grants a **Free Roll**!"
 
                 elif chosen_nerf == "demon":
                     col = headers.index("Roll Halved") + 1 if "Roll Halved" in headers else -1
                     if col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"🏋️ **The Demon Drill Sergeant!**\n*\"Drop and give me 50!\"* The Demon exhausts **{chosen_team}**. Their next dice roll is strictly **cut in half**!"
+                    embed_desc = f"<:sergeant_damien:1558999790556028998> **The Demon Drill Sergeant!**\n*\"Drop and give me 50!\"* The Demon exhausts **{chosen_team}**. Their next dice roll is strictly **cut in half**!"
 
                 elif chosen_nerf == "beekeeper":
                     new_pos = max(0, current_pos - 2)
@@ -5094,7 +5092,7 @@ class MonopolyCog(commands.Cog):
                     if pos_col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, pos_col, new_pos)
                     if new_pos == 0: await asyncio.to_thread(self.increment_rolls_available, chosen_team)
                     await asyncio.to_thread(self.log_command, chosen_team, "/card_effect_set_tile", {"team": chosen_team, "tile": new_pos})
-                    embed_desc = f"🐝 **The Beekeeper!**\n**{chosen_team}** failed to build the hive and got swarmed! They panic and flee backwards **2 tiles** to Tile **{new_pos}**!"
+                    embed_desc = f"<:bee_keeper:1559000442241814578> **The Beekeeper!**\n**{chosen_team}** failed to build the hive and got swarmed! They panic and flee backwards **2 tiles** to Tile **{new_pos}**!"
                     if new_pos == 0: embed_desc += "\n\n🎯 **BULLSEYE!** Fleeing perfectly onto GO grants a **Free Roll**!"
 
                 elif chosen_nerf == "maze":
@@ -5105,7 +5103,7 @@ class MonopolyCog(commands.Cog):
                     if pos_col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, pos_col, new_pos)
                     if new_pos == 0: await asyncio.to_thread(self.increment_rolls_available, chosen_team)
                     await asyncio.to_thread(self.log_command, chosen_team, "/card_effect_set_tile", {"team": chosen_team, "tile": new_pos})
-                    embed_desc = f"🧭 **The Mysterious Old Man's Maze!**\n**{chosen_team}** is dragged into the maze and completely loses their sense of direction! They eventually stumble out **{spaces_back}** spaces backwards, ending up on Tile **{new_pos}**!"
+                    embed_desc = f"<:mysterious_old_man:1559000625746944080> **The Mysterious Old Man's Maze!**\n**{chosen_team}** is dragged into the maze and completely loses their sense of direction! They eventually stumble out **{spaces_back}** spaces backwards, ending up on Tile **{new_pos}**!"
                     if new_pos == 0: embed_desc += "\n\n🎯 **BULLSEYE!** Stumbling perfectly onto GO grants a **Free Roll**!"
 
                 elif chosen_nerf == "pete":
@@ -5115,11 +5113,11 @@ class MonopolyCog(commands.Cog):
                     if new_pos == 0: await asyncio.to_thread(self.increment_rolls_available, chosen_team)
                     await asyncio.to_thread(self.log_command, chosen_team, "/card_effect_set_tile", {"team": chosen_team, "tile": new_pos})
                     if hasattr(self, "set_jail_status"): await asyncio.to_thread(self.set_jail_status, chosen_team, "yes")
-                    embed_desc = f"🎈 **Prison Pete!**\n**{chosen_team}** traps the player in a cage! They are instantly dragged to **Tile 10 (Jail)**!"
+                    embed_desc = f"<:prison_pete:1559000820144541746> **Prison Pete!**\n**{chosen_team}** traps the player in a cage! They are instantly dragged to **Tile 10 (Jail)**!"
                 
                 elif chosen_nerf == "bob":
                     if hasattr(self, "set_teleblock_status"): await asyncio.to_thread(self.set_teleblock_status, chosen_team, "yes")
-                    embed_desc = f"🐈‍⬛ **Evil Bob!**\n**{chosen_team}** is kidnapped to ScapeRune to catch fish! They are **Teleblocked** until their next roll!"
+                    embed_desc = f"<:evil_bob:1559001028098138112> **Evil Bob!**\n**{chosen_team}** is kidnapped to ScapeRune to catch fish! They are **Teleblocked** until their next roll!"
 
                 elif chosen_nerf == "jekyll":
                     try:
@@ -5134,17 +5132,17 @@ class MonopolyCog(commands.Cog):
                             
                             await asyncio.to_thread(self.house_data_sheet.update_cell, prop_idx, houses_col, current_houses - 1)
                             await asyncio.to_thread(self.sync_houses_owned, chosen_team)
-                            embed_desc = f"🧪 **Dr. Jekyll & Mr. Hyde!**\n*\"You won't spare a single Guam leaf?!\"* **{chosen_team}** refuses to help Dr. Jekyll. Enraged, he drinks a strange potion and violently transforms into Mr. Hyde! He goes on a rampage and completely destroys a house on Tile **{tile_id}**!"
+                            embed_desc = f"<:dr_jekyll:1559001246222786560> **Dr. Jekyll & Mr. Hyde!**\n*\"You won't spare a single Guam leaf?!\"* **{chosen_team}** refuses to help Dr. Jekyll. Enraged, he drinks a strange potion and violently transforms into Mr. Hyde! He goes on a rampage and completely destroys a house on Tile **{tile_id}**!"
                         else:
-                            embed_desc = f"🧪 **Dr. Jekyll & Mr. Hyde!**\n*\"You won't spare a single Guam leaf?!\"* **{chosen_team}** refuses to help Dr. Jekyll. He transforms into Mr. Hyde and goes on a rampage! Fortunately, **{chosen_team}** doesn't own any houses for him to destroy, so he just yells at a cloud and leaves!"
+                            embed_desc = f"<:dr_jekyll:1559001246222786560> **Dr. Jekyll & Mr. Hyde!**\n*\"You won't spare a single Guam leaf?!\"* **{chosen_team}** refuses to help Dr. Jekyll. He transforms into Mr. Hyde and goes on a rampage! Fortunately, **{chosen_team}** doesn't own any houses for him to destroy, so he just yells at a cloud and leaves!"
                     except Exception as e:
                         print(f"❌ Error during Jekyll house destruction: {e}")
-                        embed_desc = f"🧪 **Dr. Jekyll & Mr. Hyde!**\nDr. Jekyll transformed, but got confused and wandered off..."
+                        embed_desc = f"<:dr_jekyll:1559001246222786560> **Dr. Jekyll & Mr. Hyde!**\nDr. Jekyll transformed, but got confused and wandered off..."
                 
                 elif chosen_nerf == "mime":
                     col = headers.index("Silenced") + 1 if "Silenced" in headers else -1
                     if col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"🎭 **The Mime!**\n**{chosen_team}** failed to copy the Mime's emotes! A silencing aura is cast over them. They are **unable to use ANY cards** until they roll the dice again!"
+                    embed_desc = f"<:mime:1559001543557251212> **The Mime!**\n**{chosen_team}** failed to copy the Mime's emotes! A silencing aura is cast over them. They are **unable to use ANY cards** until they roll the dice again!"
 
             # ==========================================
             # 🟢 BUFF MECHANICS
@@ -5163,21 +5161,21 @@ class MonopolyCog(commands.Cog):
 
                 if chosen_buff == "certers":
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 20_000_000)
-                    embed_desc = f"📜 **The Certers!**\nNiles, Miles, and Giles unnote some rare items for **{chosen_team}**! They have been granted a massive injection of **20,000,000 GP**!"
+                    embed_desc = f"<:miles:1559002337811365889> **The Certers!**\nNiles, Miles, and Giles unnote some rare items for **{chosen_team}**! They have been granted a massive injection of **20,000,000 GP**!"
 
                 elif chosen_buff == "postie":
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 10_000_000)
-                    embed_desc = f"💌 **Postie Pete!**\n*\"Special delivery!\"* Pete hands **{chosen_team}** a parcel filled with inheritance! They receive **10,000,000 GP**!"
+                    embed_desc = f"<:postie_pete:1559001685475725392> **Postie Pete!**\n*\"Special delivery!\"* Pete hands **{chosen_team}** a parcel filled with inheritance! They receive **10,000,000 GP**!"
 
                 elif chosen_buff == "pinball":
                     col = headers.index("GP Doubled") + 1 if "GP Doubled" in headers else -1
                     if col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"⚪ **The Pinball Troll!**\n**{chosen_team}** successfully tags the pillars! The troll rewards them with a multiplier. Their next approved drop will be worth **DOUBLE GP**!"
+                    embed_desc = f"<:flippa:1559002523422163024> **The Pinball Troll!**\n**{chosen_team}** successfully tags the pillars! The troll rewards them with a multiplier. Their next approved drop will be worth **DOUBLE GP**!"
 
                 elif chosen_buff == "sandwich_good":
                     col = headers.index("Roll Bonus") + 1 if "Roll Bonus" in headers else -1
                     if col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"👩‍🍳 **The Sandwich Lady!**\n*\"Have a snack, dear!\"* **{chosen_team}** picks the correct sandwich and feels energized! They are granted a **+3 Bonus** to their next dice roll!"
+                    embed_desc = f"<:sandwich_lady:1558999634096037898> **The Sandwich Lady!**\n*\"Have a snack, dear!\"* **{chosen_team}** picks the correct sandwich and feels energized! They are granted a **+3 Bonus** to their next dice roll!"
 
                 elif chosen_buff == "turpentine":
                     all_chance = await asyncio.to_thread(self.chance_sheet.get_all_records)
@@ -5197,20 +5195,20 @@ class MonopolyCog(commands.Cog):
                         holders.remove(stolen["victim"])
                         holders.append(chosen_team)
                         await asyncio.to_thread(stolen["sheet"].update_cell, stolen["row"], 3, ", ".join(holders))
-                        embed_desc = f"🤺 **Rick Turpentine!**\n*\"Stand and deliver!\"* Rick ambushes another team and hands the loot to you! **{chosen_team}** has stolen the **{stolen['card_name']}** card from **{stolen['victim']}**!"
+                        embed_desc = f"<:rick_turpentine:1559002837818806413> **Rick Turpentine!**\n*\"Stand and deliver!\"* Rick ambushes another team and hands the loot to you! **{chosen_team}** has stolen the **{stolen['card_name']}** card from **{stolen['victim']}**!"
                     else:
                         await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 10_000_000)
-                        embed_desc = f"🤺 **Rick Turpentine!**\n*\"Stand and deliver!\"* Rick tried to steal from the other teams, but they were completely broke! He feels bad and gives **{chosen_team}** **10,000,000 GP** out of his own pocket!"
+                        embed_desc = f"<:rick_turpentine:1559002837818806413> **Rick Turpentine!**\n*\"Stand and deliver!\"* Rick tried to steal from the other teams, but they were completely broke! He feels bad and gives **{chosen_team}** **10,000,000 GP** out of his own pocket!"
 
                 elif chosen_buff == "quiz":
                     reward = random.choice(["roll", "gp", "card"])
                     if reward == "roll":
                         await asyncio.to_thread(self.increment_rolls_available, chosen_team)
-                        embed_desc = f"🧠 **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them a **Free Dice Roll**!"
+                        embed_desc = f"<:quiz_master:1559002953724076052> **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them a **Free Dice Roll**!"
                     
                     elif reward == "gp":
                         await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 15_000_000)
-                        embed_desc = f"🧠 **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them **15,000,000 GP**!"
+                        embed_desc = f"<:quiz_master:1559002953724076052> **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them **15,000,000 GP**!"
                     
                     else:  
                         all_chance = await asyncio.to_thread(self.chance_sheet.get_all_records)
@@ -5231,22 +5229,22 @@ class MonopolyCog(commands.Cog):
                             drawn_card_name = str(drawn_card["data"].get('Name', '')).strip()
                             display_name = "Protect Item Scroll" if drawn_card_name == "Protect Item" else ("Ring of Charos (a)" if drawn_card_name == "Ring of Charos" else drawn_card_name)
                             
-                            embed_desc = f"🧠 **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them a free **{display_name}**!"
+                            embed_desc = f"<:quiz_master:1559002953724076052> **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them a free **{display_name}**!"
                             
                             if drawn_card["type"] == "virtual":
                                 col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
                                 if col != -1:
                                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
                                     if drawn_card_name == "Protect Item":
-                                        embed_desc += f"\n\n<:inventory:1437979836881703074> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
+                                        embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
                                     elif drawn_card_name == "Ring of Recoil":
-                                        embed_desc += f"\n\n💍 The **Ring of Recoil** is now **ACTIVE** in your inventory!"
+                                        embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
                                     elif drawn_card_name == "Phoenix Necklace":
-                                        embed_desc += f"\n\n<:pneck:1469359523989819392> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
+                                        embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
                                     elif drawn_card_name == "Ring of Charos":
-                                        embed_desc += f"\n\n💕 The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
+                                        embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
                                     elif drawn_card_name == "Ring of Stone":
-                                        embed_desc += f"\n\n🪨 The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                                        embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
                             else:
                                 card_idx = drawn_card["index"]
                                 current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
@@ -5254,7 +5252,7 @@ class MonopolyCog(commands.Cog):
                                 await asyncio.to_thread(self.chance_sheet.update_cell, card_idx, 3, ", ".join(current_holders))
                         else:
                             await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 15_000_000)
-                            embed_desc = f"🧠 **The Quiz Master!**\n**{chosen_team}** answered correctly, but already holds every Chance card! He awards **15,000,000 GP** instead!"
+                            embed_desc = f"<:quiz_master:1559002953724076052> **The Quiz Master!**\n**{chosen_team}** answered correctly, but already holds every Chance card! He awards **15,000,000 GP** instead!"
 
                 elif chosen_buff == "arnav":
                     all_chest = await asyncio.to_thread(self.chest_sheet.get_all_records)
@@ -5282,15 +5280,15 @@ class MonopolyCog(commands.Cog):
                             if col != -1:
                                 await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
                                 if drawn_card_name == "Protect Item":
-                                    embed_desc += f"\n\n<:inventory:1437979836881703074> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Recoil":
-                                    embed_desc += f"\n\n💍 The **Ring of Recoil** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Phoenix Necklace":
-                                    embed_desc += f"\n\n<:pneck:1469359523989819392> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Charos":
-                                    embed_desc += f"\n\n💕 The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Stone":
-                                    embed_desc += f"\n\n🪨 The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
                         else:
                             card_idx = drawn_card["index"]
                             current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
@@ -5319,22 +5317,22 @@ class MonopolyCog(commands.Cog):
                         drawn_card_name = str(drawn_card["data"].get('Name', '')).strip()
                         display_name = "Protect Item Scroll" if drawn_card_name == "Protect Item" else ("Ring of Charos (a)" if drawn_card_name == "Ring of Charos" else drawn_card_name)
 
-                        embed_desc = f"🎁 **The Mysterious Old Man!**\n**{chosen_team}** successfully solved the Strange Box! They have been granted a free **{display_name}**!"
+                        embed_desc = f"<:mystery_box:1559004276175536128> **The Mysterious Old Man!**\n**{chosen_team}** was given a Strange Box! They have been granted a free **{display_name}**!"
                         
                         if drawn_card["type"] == "virtual":
                             col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
                             if col != -1:
                                 await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
                                 if drawn_card_name == "Protect Item":
-                                    embed_desc += f"\n\n<:inventory:1437979836881703074> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Recoil":
-                                    embed_desc += f"\n\n💍 The **Ring of Recoil** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Phoenix Necklace":
-                                    embed_desc += f"\n\n<:pneck:1469359523989819392> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Charos":
-                                    embed_desc += f"\n\n💕 The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Stone":
-                                    embed_desc += f"\n\n🪨 The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
                         else:
                             card_idx = drawn_card["index"]
                             current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
@@ -5342,16 +5340,16 @@ class MonopolyCog(commands.Cog):
                             await asyncio.to_thread(self.chance_sheet.update_cell, card_idx, 3, ", ".join(current_holders))
                     else:
                         await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 10_000_000)
-                        embed_desc = f"🎁 **The Mysterious Old Man!**\n**{chosen_team}** solved the box but already has all the cards! They found **10,000,000 GP** inside instead!"
+                        embed_desc = f"<:mystery_box:1559004276175536128> **The Mysterious Old Man!**\n**{chosen_team}** solved the box but already has all the cards! They found **10,000,000 GP** inside instead!"
 
                 elif chosen_buff == "frog":
                     await asyncio.to_thread(self.increment_rolls_available, chosen_team)
-                    embed_desc = f"🐸 **Kiss the Frog!**\n**{chosen_team}** kisses the royal frog and breaks the curse! The Frog Princess has rewarded them with an immediate **Free Dice Roll**!"
+                    embed_desc = f"<:frog:1559005336214573087> **Kiss the Frog!**\n**{chosen_team}** kisses the Royal Frog! The Royal Frog has rewarded them with an immediate **Free Dice Roll**!"
 
                 elif chosen_buff == "countcheck":
                     col = headers.index("Double Card") + 1 if "Double Card" in headers else -1
                     if col != -1: await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                    embed_desc = f"🧛🏻‍♀️ **Count Check!**\n**{chosen_team}** sets up their Authenticator and Bank PIN! Their account security grants them the ability to use **TWO cards** on their current tile instead of just one!"
+                    embed_desc = f"<:count_check:1559005679656763452> **Count Check!**\n**{chosen_team}** sets up their Authenticator and Bank PIN! Their account security grants them the ability to use **TWO cards** on their current tile instead of just one!"
 
                 elif chosen_buff == "exam":
                     all_chance = await asyncio.to_thread(self.chance_sheet.get_all_records)
@@ -5374,28 +5372,28 @@ class MonopolyCog(commands.Cog):
                     
                     if not unowned_cards:
                         await asyncio.to_thread(self.increment_rolls_available, chosen_team)
-                        embed_desc = f"🐲 **Surprise Exam!**\nMr. Mordaut is stunned—**{chosen_team}** already knows everything! He awards them a **Free Dice Roll** for their perfect score!"
+                        embed_desc = f"<:dunce:1559005843683278848> **Surprise Exam!**\nMr. Mordaut is stunned—**{chosen_team}** already knows everything! He awards them a **Free Dice Roll** for their perfect score!"
                     else:
                         drawn_card = random.choice(unowned_cards)
                         drawn_card_name = str(drawn_card["data"].get('Name', '')).strip()
                         display_name = "Protect Item Scroll" if drawn_card_name == "Protect Item" else ("Ring of Charos (a)" if drawn_card_name == "Ring of Charos" else drawn_card_name)
                         
-                        embed_desc = f"🐲 **Surprise Exam!**\nMr. Mordaut tests **{chosen_team}**, and they score an A+! They are awarded a free **{display_name}**!"
+                        embed_desc = f"<:dunce:1559005843683278848> **Surprise Exam!**\nMr. Mordaut tests **{chosen_team}**, and they score an A+! They are awarded a free **{display_name}**!"
                         
                         if drawn_card["type"] == "virtual":
                             col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
                             if col != -1:
                                 await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
                                 if drawn_card_name == "Protect Item":
-                                    embed_desc += f"\n\n<:inventory:1437979836881703074> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Recoil":
-                                    embed_desc += f"\n\n💍 The **Ring of Recoil** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Phoenix Necklace":
-                                    embed_desc += f"\n\n<:pneck:1469359523989819392> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Charos":
-                                    embed_desc += f"\n\n💕 The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
                                 elif drawn_card_name == "Ring of Stone":
-                                    embed_desc += f"\n\n🪨 The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                                    embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
                         else:
                             current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
                             current_holders.append(chosen_team)
@@ -5404,7 +5402,7 @@ class MonopolyCog(commands.Cog):
                 elif chosen_buff == "genie":
                     boost = int(current_gp * 0.15)
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + boost)
-                    embed_desc = f"🧞 **The Genie!**\n*\"A wish granted!\"* The Genie magically multiplies **{chosen_team}**'s wealth, granting them a permanent **15% boost** to their current GP stack (**+{boost:,} GP**)!"
+                    embed_desc = f"<:genie:1559006178535546980> **The Genie!**\n*\"A wish granted!\"* The Genie magically multiplies **{chosen_team}**'s wealth, granting them a permanent **15% boost** to their current GP stack (**+{boost:,} GP**)!"
             
             embed = discord.Embed(title=event_title, description=embed_desc, color=embed_color)
             await channel.send(embed=embed)
