@@ -4259,6 +4259,11 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ You cannot use **Varrock Tele** while on tile 10 (Nex/Gauntlet).", ephemeral=True)
                     return 
 
+                shortest_dist = min(abs(BANK_STANDING_TILE - caster_pos), BOARD_SIZE - abs(BANK_STANDING_TILE - caster_pos))
+                if shortest_dist > 11:
+                    await interaction.followup.send(f"❌ Card effect failed: You must be within 11 tiles of Bank Standing (Tile {BANK_STANDING_TILE}) to use this teleport. You are currently {shortest_dist} tiles away.", ephemeral=True)
+                    return
+
                 new_pos = self.resolve_nonroll_landing_tile(BANK_STANDING_TILE)
                 await asyncio.to_thread(self.log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
                 
@@ -4343,15 +4348,16 @@ class MonopolyCog(commands.Cog):
                     
                     distance = (house_tile - caster_pos) % BOARD_SIZE
                     
-                    if 0 < distance < min_distance:
-                        min_distance = distance
-                        closest_house_pos = house_tile
+                    if 0 < distance <= 10:
+                        if distance < min_distance:
+                            min_distance = distance
+                            closest_house_pos = house_tile
 
                 if closest_house_pos != -1 and closest_house_pos < caster_pos:
                     passed_go_on_tele = True
 
                 if closest_house_pos == -1:
-                    await interaction.followup.send("❌ Card effect failed: No other house tiles exist on the board.", ephemeral=True)
+                    await interaction.followup.send("❌ Card effect failed: There are no houses within 10 tiles ahead of you.", ephemeral=True)
                     return
 
                 intended_pos = closest_house_pos
