@@ -1851,31 +1851,7 @@ class MonopolyCog(commands.Cog):
         
         # 4. Go logic
         if raw_pos >= 40 and new_pos != 30: 
-            try:
-                pass_go_col = headers.index("Go Passes") + 1
-                gp_col = headers.index("GP") + 1
-                
-                cur_passes = int(all_records[team_row_index-2].get("Go Passes", 0))
-                cur_gp = int(str(all_records[team_row_index-2].get("GP", 0)).replace(',',''))
-                
-                is_gp_halved = str(all_records[team_row_index-2].get("GP Halved", "no")).strip().lower() == "yes"
-                go_reward = 10_000_000 if is_gp_halved else 20_000_000
-
-                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, pass_go_col, cur_passes + 1)
-                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, gp_col, cur_gp + go_reward)
-            
-                if is_gp_halved:
-                    go_message = f"<:MaxCash:1558959942394847372> **PASS GO!** You passed **GO** and received **10,000,000 GP** (Halved by <:ent:1558999589317640262> **The Ents**!) and **3 Random Cards**!"
-                else:
-                    go_message = f"<:MaxCash:1558959942394847372> **CONGRATULATIONS!** You passed **GO** and received **20,000,000 GP** and **3 Random Cards**!"
-                
-                # ---> ADDED THIS LOOP <---
-                for _ in range(3):
-                    card_type = random.choice(["Chest", "Chance"])
-                    await self.team_receives_card(team_name, card_type, team_chan)
-            
-            except Exception as e:
-                print(f"❌ Error updating Pass Go: {e}")
+            go_message = await self.process_manual_pass_go(team_name, team_row_index, team_record)
 
         # 5. Special Tiles (Gliders / Jail)
         glider_message = ""
@@ -1898,27 +1874,10 @@ class MonopolyCog(commands.Cog):
                     elif new_pos == 38: 
                         if current_tile != 12:
                             new_pos = 12
-                            try:
-                                pass_go_col = headers.index("Go Passes") + 1
-                                cur_passes = int(all_records[team_row_index-2].get("Go Passes", 0))
-                                is_gp_halved = str(all_records[team_row_index-2].get("GP Halved", "no")).strip().lower() == "yes"
-                                glider_reward = 10_000_000 if is_gp_halved else 20_000_000
-                                if is_gp_halved:
-                                    asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "GP Halved"))
-                                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, pass_go_col, cur_passes + 1)
-                                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_index, gp_col, cur_gp + glider_reward)
-                                
-                                if is_gp_halved:
-                                    go_message = f"<:ent:1558999589317640262> <:gnome_glider:1559011826442838066> **GLIDER BONUS REDUCED!** You flew over **GO**, but the Ents damaged your glider. You only received **10,000,000 GP** and **3 Random Cards**!"
-                                else:
-                                    go_message = "<:go:1559018777343950848> **GLIDER BONUS!** You flew over **GO** and received **20,000,000 GP** and **3 Random Cards**!"
-                                
-                                for _ in range(3):
-                                    card_type = random.choice(["Chest", "Chance"])
-                                    await self.team_receives_card(team_name, card_type, team_chan)
-                                    
-                            except Exception as e:
-                                print(f"❌ Error updating Glider Go Bonus: {e}")
+                            if current_tile != 12:
+                            new_pos = 12
+                            glider_go_msg = await self.process_manual_pass_go(team_name, team_row_index, all_records[team_row_index-2])
+                            go_message = f"<:gnome_glider:1559011826442838066> **GLIDER FLIGHT OVER GO!**{glider_go_msg}"
                         else:
                             new_pos = 38
                 else:
@@ -2074,6 +2033,22 @@ class MonopolyCog(commands.Cog):
             return JAIL_TILE
         return pos
 
+    async def apply_virtual_passive(self, team_row_idx: int, headers: list, passive_name: str) -> str:
+        emoji_map = {
+            "Protect Item": ("<:protect_item:1559003530050670632>", "Protect Item Scroll"),
+            "Ring of Recoil": ("<:recoil:1558985588055609374>", "Ring of Recoil"),
+            "Phoenix Necklace": ("<:pneck:1558990483110367242>", "Phoenix Necklace"),
+            "Ring of Charos": ("<:charos:1558985798483837049>", "Ring of Charos (a)"),
+            "Ring of Stone": ("<:ring_of_stone:1558985677134241873>", "Ring of Stone"),
+            "Ring of Wealth": ("<:ring_of_wealth:1559360652210868234>", "Ring of Wealth"),
+        }
+        if passive_name in headers:
+            col = headers.index(passive_name) + 1
+            await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
+            emoji, display = emoji_map.get(passive_name, ("💎", passive_name))
+            return f"\n\n{emoji} The **{display}** is now **ACTIVE** in your inventory!"
+        return ""
+    
     def get_glider_redirect_note(self, intended_pos: int, final_pos: int, *, second_person: bool = False, quoted: bool = True) -> str:
         """Return feedback text when a non-roll move lands on a glider and is redirected."""
         try:
@@ -2540,17 +2515,7 @@ class MonopolyCog(commands.Cog):
             return
         
         # 2. Boss Map
-        tile_boss_map = {
-            1: ["Zulrah"], 3: ["General Graardor"],
-            4: ["Phantom Muspah"], 5: ["The Whisperer"], 6: ["Callisto"],
-            8: ["Vet'ion"], 9: ["Venenatis"], 10: ["Gauntlet", "Nex"], 11: ["Corp"],
-            13: ["Moons of Peril"], 14: ["Hueycoatl"], 15: ["Duke Sucellus"], 16: ["Maggot King"],
-            18: ["K'ril Tsutsaroth"], 19: ["Abyssal Sire", "Alchemical Hydra", "Araxxor", "Cerberus", "Grotesque Guardians", "Kraken", "Thermonuclear Smoke Devil"],
-            21: ["Tombs of Amascut"], 23: ["Theatre of Blood"], 24: ["Chambers of Xeric"],
-            25: ["Vardorvis"], 26: ["Yama"], 27: ["Colosseum"], 29: ["Doom of Mokhaiotl"],
-            31: ["Kree'arra"], 32: ["Kalphite Queen"], 34: ["Nightmare"],
-            35: ["The Leviathan"], 37: ["Zilyana"], 39: ["Mad Angel"]
-        }
+        tile_boss_map = self._get_tile_boss_map()
 
         bosses_for_tile = tile_boss_map.get(current_tile, [])
 
@@ -3923,38 +3888,6 @@ class MonopolyCog(commands.Cog):
                 embed = discord.Embed(title="🎯 Target Selection: Smite", description="Select a team to Smite!", color=discord.Color.red())
                 extra_memory = {"card_sheet": card_sheet, "card_row": card_row, "wildcard_data": wildcard_data, "team_wildcard_value": team_wildcard_value, "smitable_cards": smitable_cards, "double_card_note": double_card_note}
                 view = self.CardTargetView(self, team_name, list(team_card_counts.keys()), "Smite", "smite", extra_data=extra_memory)
-                await interaction.followup.send(embed=embed, view=view, ephemeral=False)
-                return
-
-                chest_data = self.chest_sheet.get_all_values()
-                if chest_data:
-                    headers = chest_data[0]
-                    name_col, held_by_col, wildcard_col = headers.index("Name"), headers.index("Held By Team"), headers.index("Wildcard")
-                    for i, row in enumerate(chest_data[1:], start=2):
-                        if len(row) <= max(name_col, held_by_col, wildcard_col): continue
-                        held_by_str = str(row[held_by_col] or "")
-                        if held_by_str and team_name not in held_by_str:
-                            all_holders = [t.strip() for t in held_by_str.split(',') if t.strip()]
-                            wildcard_str = str(row[wildcard_col] or "{}")
-                            wildcard_data_json = {}
-                            try: wildcard_data_json = json.loads(wildcard_str)
-                            except: pass
-                            valid_victims = [h for h in all_holders if h != team_name and wildcard_data_json.get(h) != "active"]
-                            if valid_victims:
-                                for v in valid_victims:
-                                    stealable_cards.append({"sheet": self.chest_sheet, "row_index": i, "card_name": str(row[name_col]), "card_type": "Chest", "victim_team": v})
-                
-                if not stealable_cards:
-                    await interaction.followup.send("❌ Card effect failed: There are no eligible cards to steal.", ephemeral=True)
-                    return 
-
-                team_card_counts = {}
-                for c in stealable_cards:
-                    team_card_counts[c["victim_team"]] = team_card_counts.get(c["victim_team"], 0) + 1
-
-                embed = discord.Embed(title="🎯 Target Selection: Rogue's Gloves", description="Select a team to steal from!", color=discord.Color.dark_gray())
-                extra_memory = {"card_sheet": card_sheet, "card_row": card_row, "wildcard_data": wildcard_data, "team_wildcard_value": team_wildcard_value, "stealable_cards": stealable_cards, "double_card_note": double_card_note}
-                view = self.CardTargetView(self, team_name, list(team_card_counts.keys()), "Rogue's Gloves", "rogues_gloves", extra_data=extra_memory)
                 await interaction.followup.send(embed=embed, view=view, ephemeral=False)
                 return
 
@@ -5614,21 +5547,7 @@ class MonopolyCog(commands.Cog):
                             embed_desc = f"<:quiz_master:1559002953724076052> **The Quiz Master!**\n**{chosen_team}** answered the odd-one-out correctly! The Quiz Master awards them a free **{display_name}**!"
                             
                             if drawn_card["type"] == "virtual":
-                                col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
-                                if col != -1:
-                                    await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                                    if drawn_card_name == "Protect Item":
-                                        embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
-                                    elif drawn_card_name == "Ring of Recoil":
-                                        embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
-                                    elif drawn_card_name == "Phoenix Necklace":
-                                        embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
-                                    elif drawn_card_name == "Ring of Charos":
-                                        embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
-                                    elif drawn_card_name == "Ring of Stone":
-                                        embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
-                                    elif drawn_card_name == "Ring of Wealth":
-                                        embed_desc += f"\n\n<:ring_of_wealth:1559360652210868234> The **Ring of Wealth** is now **ACTIVE** in your inventory!"
+                                embed_desc += await self.apply_virtual_passive(team_row_idx, headers, drawn_card_name)
                             else:
                                 card_idx = drawn_card["index"]
                                 current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
@@ -5660,19 +5579,7 @@ class MonopolyCog(commands.Cog):
                         embed_desc = f"🏴‍☠️ **Capt' Arnav's Chest!**\n**{chosen_team}** successfully cracked the combination! They have been granted a free **{display_name}**!"
                         
                         if drawn_card["type"] == "virtual":
-                            col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
-                            if col != -1:
-                                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                                if drawn_card_name == "Protect Item":
-                                    embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Recoil":
-                                    embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Phoenix Necklace":
-                                    embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Charos":
-                                    embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Stone":
-                                    embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                            embed_desc += await self.apply_virtual_passive(team_row_idx, headers, drawn_card_name)
                         else:
                             card_idx = drawn_card["index"]
                             current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
@@ -5704,19 +5611,7 @@ class MonopolyCog(commands.Cog):
                         embed_desc = f"<:mystery_box:1559004276175536128> **The Mysterious Old Man!**\n**{chosen_team}** was given a Strange Box! They have been granted a free **{display_name}**!"
                         
                         if drawn_card["type"] == "virtual":
-                            col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
-                            if col != -1:
-                                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                                if drawn_card_name == "Protect Item":
-                                    embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Recoil":
-                                    embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Phoenix Necklace":
-                                    embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Charos":
-                                    embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Stone":
-                                    embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                            embed_desc += await self.apply_virtual_passive(team_row_idx, headers, drawn_card_name)
                         else:
                             card_idx = drawn_card["index"]
                             current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
@@ -5765,19 +5660,7 @@ class MonopolyCog(commands.Cog):
                         embed_desc = f"<:dunce:1559005843683278848> **Surprise Exam!**\nMr. Mordaut tests **{chosen_team}**, and they score an A+! They are awarded a free **{display_name}**!"
                         
                         if drawn_card["type"] == "virtual":
-                            col = headers.index(drawn_card_name) + 1 if drawn_card_name in headers else -1
-                            if col != -1:
-                                await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col, "yes")
-                                if drawn_card_name == "Protect Item":
-                                    embed_desc += f"\n\n<:protect_item:1559003530050670632> The **Protect Item Scroll** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Recoil":
-                                    embed_desc += f"\n\n<:recoil:1558985588055609374> The **Ring of Recoil** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Phoenix Necklace":
-                                    embed_desc += f"\n\n<:pneck:1558990483110367242> The **Phoenix Necklace** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Charos":
-                                    embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
-                                elif drawn_card_name == "Ring of Stone":
-                                    embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                            embed_desc += await self.apply_virtual_passive(team_row_idx, headers, drawn_card_name)
                         else:
                             current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
                             current_holders.append(chosen_team)
