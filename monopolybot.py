@@ -64,6 +64,7 @@ CARD_EMOJIS = {
     "Backstab": "<:boner:1558986033440489563>",
     "Smite": "<:smite:1558986008404697199>",
     "Tele Other": "<:teleother:1558985957561213000>",
+    "Entangle": "<:entangle:1559357859349667890>",
     "Tele Block": "<:teleblock:1558985901831364710>",
     "Chest": "<:chest:1558985858516787251>",
     "Chance": "<:chance:1558993615152353360>"
@@ -4792,6 +4793,123 @@ class MonopolyCog(commands.Cog):
                     )
                     await victim_channel.send(embed=victim_embed)
                     await self.mirror_to_game_log(victim_channel, embed=victim_embed)
+        
+        elif action == "entangle":
+            embed_color = discord.Color.dark_green()
+            victim_team = target_team
+
+            team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+            headers = list(team_records[0].keys())
+            rp_col_idx = headers.index("Roll Penalty") + 1
+
+            victim_info = next((r for r in team_records if r.get("Team") == victim_team), {})
+            caster_info = next((r for r in team_records if r.get("Team") == team_name), {})
+            v_row_idx = team_records.index(victim_info) + 2 if victim_info else -1
+            c_row_idx = team_records.index(caster_info) + 2 if caster_info else -1
+
+            has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
+            has_recoil = str(victim_info.get("Ring of Recoil", "no")).strip().lower() == "yes"
+
+            # 1. Redemption
+            if await asyncio.to_thread(self.check_and_consume_redemption, victim_team):
+                embed_description += f"> <:redemption:1558985458195898389> **{victim_team}**'s Redemption activated! The Entangle spell fizzled."
+                if victim_channel:
+                    fizzle_embed = discord.Embed(
+                        title="<:redemption:1558985458195898389> Redemption Activated!",
+                        description=f"**{team_name}** tried to cast **Entangle** on you, but your **Redemption** absorbed the roots!",
+                        color=discord.Color.blue()
+                    )
+                    await victim_channel.send(embed=fizzle_embed)
+                    await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
+
+            # 2. Ring of Stone
+            elif has_stone:
+                await self.consume_ring_of_stone(victim_team)
+                embed_description += f"> <:ring_of_stone:1558985677134241873> **{victim_team}** was wearing a **Ring of Stone**! Their solid form broke free of the roots!"
+                stone_caster_embed = discord.Embed(
+                    title="<:ring_of_stone:1558985677134241873> Spell Blocked!",
+                    description=f"You tried to Entangle **{victim_team}**, but their **Ring of Stone** absorbed the snare!",
+                    color=discord.Color.red()
+                )
+                await interaction.channel.send(embed=stone_caster_embed)
+                await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
+
+                if victim_channel:
+                    stone_embed = discord.Embed(
+                        title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!",
+                        description=f"**{team_name}** tried to cast **Entangle** on you, but your **Ring of Stone** broke the vines!",
+                        color=discord.Color.blue()
+                    )
+                    await victim_channel.send(embed=stone_embed)
+                    await self.mirror_to_game_log(victim_channel, embed=stone_embed)
+
+            # 3. Vengeance
+            elif await asyncio.to_thread(self.check_and_consume_vengeance, victim_team):
+                if c_row_idx != -1:
+                    await asyncio.to_thread(self.team_data_sheet.update_cell, c_row_idx, rp_col_idx, "2")
+                embed_description += f"> <:venge:1558986464409297077> **{victim_team}** had Vengeance! The roots rebounded, inflicting a **-2 roll penalty** on **{team_name}**!"
+                
+                skull_embed = discord.Embed(
+                    title="<:venge:1558986464409297077> Vengeance Activated!",
+                    description=f"You activated **{victim_team}**'s Vengeance!\nYour team has been entangled (-2 to next roll)!",
+                    color=discord.Color.dark_red()
+                )
+                await interaction.channel.send(embed=skull_embed)
+                await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
+
+                if victim_channel:
+                    victim_embed = discord.Embed(
+                        title="<:venge:1558986464409297077> Vengeance Activated!",
+                        description=f"**{team_name}** cast **Entangle** on you, but your **Vengeance** reflected the vines! Their next roll is reduced by 2.",
+                        color=discord.Color.dark_red()
+                    )
+                    await victim_channel.send(embed=victim_embed)
+                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
+
+            # 4. Ring of Recoil
+            elif has_recoil:
+                await self.consume_recoil(victim_team)
+                if v_row_idx != -1:
+                    await asyncio.to_thread(self.team_data_sheet.update_cell, v_row_idx, rp_col_idx, "2")
+                if c_row_idx != -1:
+                    await asyncio.to_thread(self.team_data_sheet.update_cell, c_row_idx, rp_col_idx, "2")
+                embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** Both **{team_name}** and **{victim_team}** are entangled (-2 to their next rolls)!"
+
+                recoil_caster_embed = discord.Embed(
+                    title="<:recoil:1558985588055609374> Recoil Activated!",
+                    description=f"**{victim_team}** wore a **Ring of Recoil**! The vines snapped back, entangling both teams (-2 to next roll)!",
+                    color=discord.Color.dark_red()
+                )
+                await interaction.channel.send(embed=recoil_caster_embed)
+                await self.mirror_to_game_log(interaction.channel, embed=recoil_caster_embed)
+
+                if victim_channel:
+                    victim_embed = discord.Embed(
+                        title="<:recoil:1558985588055609374> Recoil Shattered!",
+                        description=f"**{team_name}** cast **Entangle** on you, but your **Ring of Recoil** triggered! Both teams suffer a -2 roll penalty.",
+                        color=discord.Color.green()
+                    )
+                    await victim_channel.send(embed=victim_embed)
+                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
+
+            # 5. Normal Hit
+            else:
+                elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, victim_team)
+                penalty_val = 1 if elder_maul_active else 2
+                maul_note = " (Reduced to -1 by <:eldermaul:1558986407735861359> **Elder Maul**!)" if elder_maul_active else ""
+
+                if v_row_idx != -1:
+                    await asyncio.to_thread(self.team_data_sheet.update_cell, v_row_idx, rp_col_idx, str(penalty_val))
+                embed_description += f"> <:entangle:1559357859349667890> **{victim_team}** has been entangled! Their next dice roll is reduced by **{penalty_val}** (minimum 1 tile moved){maul_note}."
+
+                if victim_channel:
+                    entangle_embed = discord.Embed(
+                        title="<:entangle:1559357859349667890> You Were Entangled!",
+                        description=f"**{team_name}** used **Entangle** on your team! Your next dice roll will be reduced by **{penalty_val}** (minimum 1 moved){maul_note}.",
+                        color=discord.Color.dark_green()
+                    )
+                    await victim_channel.send(embed=entangle_embed)
+                    await self.mirror_to_game_log(victim_channel, embed=entangle_embed)
 
         elif action == "pickpocket":
             embed_color = discord.Color.dark_gold()
