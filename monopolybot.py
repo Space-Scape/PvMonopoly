@@ -1272,7 +1272,7 @@ class MonopolyCog(commands.Cog):
                             extra_jail_text = ""
                             if current_tile == 10 and is_in_jail:
                                 await asyncio.to_thread(self.cog.set_jail_status, team_name, "no")
-                                extra_jail_text = "\n\n⛓️ **Jailbreak!** Your team has completed their sentence and is no longer In Jail!"
+                                extra_jail_text = "\n\n<:jail:1559419630034886797> **Jailbreak!** Your team has completed their sentence and is no longer In Jail!"
 
                             if team_chan:
                                 roll_grant_embed = discord.Embed(
@@ -1930,7 +1930,7 @@ class MonopolyCog(commands.Cog):
 
         elif new_pos == 30:
             new_pos = 10 # JAIL_TILE
-            go_message = "⛓️ **GO TO JAIL!** You are immediately sent to prison."
+            go_message = "<:jail:1559419630034886797> **GO TO JAIL!** You are immediately sent to prison."
             await asyncio.to_thread(self.set_jail_status, team_name, "yes")
 
         # 6. Update Position & Results
@@ -2286,7 +2286,7 @@ class MonopolyCog(commands.Cog):
                 inline=False
             )
             embed2.add_field(
-                name="🗡️ Scavenging (Off-Board Bosses)",
+                name=" Scavenging (Off-Board Bosses)",
                 value="Don't want to hunt the boss on your current tile? Use `/scavenge` to hunt off-board bosses (Vorkath, DKS, Sarachnis, Giant Mole) instead! Completing all 4 grants a **Free Roll**, but triggers the Bank's **Skip Tax**, which destroys or repossesses one of your houses!",
                 inline=False
             )
@@ -2329,113 +2329,70 @@ class MonopolyCog(commands.Cog):
             await interaction.followup.send(f"An error occurred: {e}", ephemeral=True)
             traceback.print_exc()
 
-    @app_commands.command(name="gp", description="Check your team's current GP balance.")
-    async def gp(self, interaction: discord.Interaction):
-        if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
-            await interaction.response.send_message(
-                "❌ You can only use this command in your team's channel.", ephemeral=True
-            )
-            return
-
-        await interaction.response.defer(ephemeral=False)  
-        team_name = self.get_team(interaction.user)
-        if not team_name:
-            await interaction.followup.send("❌ You must be on a team to check GP.", ephemeral=True)
-            return
-        try:
-            records = self.team_data_sheet.get_all_records()
-            team_gp = 0
-            found_team = False
-            for record in records:
-                if record.get("Team") == team_name:
-                    team_gp = int(record.get("GP", 0) or 0)
-                    found_team = True
-                    break
-            if not found_team:
-                await interaction.followup.send(f"❌ Could not find data for **{team_name}**.", ephemeral=True)
-                return
-            embed = discord.Embed(
-                title=f"<:MaxCash:1558959942394847372> {team_name} Team Status",
-                color=discord.Color.gold()
-            )
-            embed.add_field(
-                name="GP Balance",
-                value=f"**{team_gp:,} GP**",
-                inline=False
-            )
-            await interaction.followup.send(embed=embed)
-        except Exception as e:
-            print(f"❌ Error in /gp command: {e}")
-            await interaction.followup.send("❌ An error occurred while fetching GP balance.", ephemeral=True)
-
-    @app_commands.command(name="stats", description="Show GP, Go Passes, and Houses Owned for all teams.")
+    @app_commands.command(name="stats", description="View your team's consolidated status and tournament balance.")
     async def stats(self, interaction: discord.Interaction):
+        team_name = self.get_team(interaction.user) or self.get_team_name_from_channel(interaction.channel)
+        if not team_name:
+            await interaction.response.send_message("❌ You are not on a team.", ephemeral=True)
+            return
+
         await interaction.response.defer(ephemeral=False)
         try:
             records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
-            if not records:
-                await interaction.followup.send("❌ Team data is unavailable.", ephemeral=True)
+            team_data = next((r for r in records if r.get("Team") == team_name), None)
+            if not team_data:
+                await interaction.followup.send(f"❌ Could not find data for **{team_name}**.", ephemeral=True)
                 return
-            
-            gp_list = []
-            go_passes_list = []
-            houses_list = []
 
-            for record in records:
-                team_name = record.get("Team", "")
-                if not team_name: 
-                    continue
-                
-                team_gp_str = str(record.get("GP", 0)).replace(',', '').strip()
-                team_gp = int(team_gp_str) if team_gp_str and team_gp_str.lstrip('-').isdigit() else 0
-                
-                team_passes_str = str(record.get("Go Passes", 0)).replace(',', '').strip()
-                team_passes = int(team_passes_str) if team_passes_str and team_passes_str.lstrip('-').isdigit() else 0
-                
-                team_houses_str = str(record.get("Houses Owned", 0)).replace(',', '').strip()
-                team_houses = int(team_houses_str) if team_houses_str and team_houses_str.lstrip('-').isdigit() else 0
-                
-                gp_list.append({"team": team_name, "value": team_gp})
-                go_passes_list.append({"team": team_name, "value": team_passes})
-                houses_list.append({"team": team_name, "value": team_houses})
-                
-            gp_list.sort(key=lambda x: x["value"], reverse=True)
-            go_passes_list.sort(key=lambda x: x["value"], reverse=True)
-            houses_list.sort(key=lambda x: x["value"], reverse=True)
+            # Basic Metrics
+            cur_pos = int(team_data.get("Position", 0) or 0)
+            is_jailed = str(team_data.get("In Jail", "no")).strip().lower() == "yes"
+            tile_name = self.get_tile_name_for_display(cur_pos)
+            jail_tag = " ⛓️ **(In Jail)**" if (cur_pos == 10 and is_jailed) else ""
 
-            gp_output = ""
-            for i, entry in enumerate(gp_list, 1):
-                gp_output += f"**{i}. {entry['team']}**: {entry['value']:,}\n"
+            gp_val = int(str(team_data.get("GP", 0)).replace(',', '').strip() or 0)
+            rolls = int(str(team_data.get("Rolls Available", 0)).replace(',', '').strip() or 0)
+            passes = int(str(team_data.get("Go Passes", 0)).replace(',', '').strip() or 0)
+            houses = int(str(team_data.get("Houses Owned", 0)).replace(',', '').strip() or 0)
 
-            passes_output = ""
-            for i, entry in enumerate(go_passes_list, 1):
-                passes_output += f"**{i}. {entry['team']}**: {entry['value']}\n"
+            # Cards Held
+            chest_count = len(self.get_held_cards(self.chest_sheet, team_name))
+            chance_count = len(self.get_held_cards(self.chance_sheet, team_name))
 
-            houses_output = ""
-            for i, entry in enumerate(houses_list, 1):
-                houses_output += f"**{i}. {entry['team']}**: {entry['value']}\n"
+            # Passives & Statuses
+            passives = [
+                p for p in ["Protect Item", "Ring of Recoil", "Phoenix Necklace", "Ring of Charos", "Ring of Stone", "Ring of Wealth"]
+                if str(team_data.get(p, "no")).strip().lower() == "yes"
+            ]
 
+            nerfs = []
+            if str(team_data.get("Poisoned Roll", "no")).strip().lower() == "yes": nerfs.append("Poisoned (Cap 3)")
+            if str(team_data.get("Roll Halved", "no")).strip().lower() == "yes": nerfs.append("Roll Halved")
+            if str(team_data.get("GP Halved", "no")).strip().lower() == "yes": nerfs.append("GP Halved")
+            if str(team_data.get("Teleblocked", "no")).strip().lower() == "yes": nerfs.append("Teleblocked")
+            if str(team_data.get("Silenced", "no")).strip().lower() == "yes": nerfs.append("Silenced")
+
+            # Embed Build
             embed = discord.Embed(
-                title="🌐 Monopoly Leaderboard",
-                description="Current progress stats for all teams.",
-                color=discord.Color.blue()
+                title=f"🛡️ {team_name} Status",
+                color=self._get_game_log_team_color(team_name)
             )
+            embed.add_field(name="📍 Location", value=f"Tile {cur_pos}: **{tile_name}**{jail_tag}", inline=False)
+            embed.add_field(name="<:MaxCash:1558959942394847372> GP Vault", value=f"**{gp_val:,} GP**", inline=True)
+            embed.add_field(name="🎲 Available Rolls", value=f"**{rolls}**", inline=True)
+            embed.add_field(name="<:go:1559018777343950848> Passes", value=f"**{passes}**", inline=True)
+            embed.add_field(name="<:pohvoucher:1558986290895003780> Houses", value=f"**{houses}**", inline=True)
+            embed.add_field(name="🃏 Cards", value=f"{chest_count} Chest | {chance_count} Chance", inline=True)
+            embed.add_field(name="✨ Active Passives", value=", ".join(passives) if passives else "*None*", inline=True)
             
-            if gp_output:
-                embed.add_field(name="<:MaxCash:1558959942394847372> GP Holdings", value=gp_output, inline=True)
-                
-            if passes_output:
-                embed.add_field(name="<:go:1559018777343950848> Go Passes", value=passes_output, inline=True)
+            if nerfs:
+                embed.add_field(name="⚠️ Debuffs", value=", ".join(nerfs), inline=False)
 
-            if houses_output:
-                embed.add_field(name="<:pohvoucher:1558986290895003780> Houses Owned", value=houses_output, inline=True)
-                
             await interaction.followup.send(embed=embed)
 
         except Exception as e:
             print(f"❌ Error in /stats command: {e}")
-            traceback.print_exc()
-            await interaction.followup.send("❌ An error occurred while fetching leaderboard data.", ephemeral=True)
+            await interaction.followup.send("❌ Error fetching status.", ephemeral=True)
 
     @app_commands.command(name="buy_house", description="Attempt to buy a house on your current tile.")
     async def buy_house(self, interaction: discord.Interaction):
@@ -5771,7 +5728,7 @@ class MonopolyCog(commands.Cog):
 
                 elif chosen_buff == "frog":
                     await asyncio.to_thread(self.increment_rolls_available, chosen_team)
-                    embed_desc = f"<:frog:1559005336214573087> **Kiss the Frog!**\n**{chosen_team}** kisses the Royal Frog! The Royal Frog has rewarded them with an immediate **Free Dice Roll**!"
+                    embed_desc = f"<:frog:1559421667812581396> **Kiss the Frog!**\n**{chosen_team}** kisses the Royal Frog! The Royal Frog has rewarded them with an immediate **Free Dice Roll**!"
 
                 elif chosen_buff == "countcheck":
                     col = headers.index("Double Card") + 1 if "Double Card" in headers else -1
