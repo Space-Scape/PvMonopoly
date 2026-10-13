@@ -699,8 +699,9 @@ class MonopolyCog(commands.Cog):
             pass_go_col = headers.index("Go Passes") + 1
             gp_col = headers.index("GP") + 1
             
-            cur_passes = int(team_record.get("Go Passes", 0))
-            cur_gp = int(str(team_record.get("GP", 0)).replace(',',''))
+            fresh_record = all_records[team_row_idx - 2]
+            cur_passes = int(fresh_record.get("Go Passes", 0))
+            cur_gp = int(str(fresh_record.get("GP", 0)).replace(',',''))
             
             is_gp_halved = str(team_record.get("GP Halved", "no")).strip().lower() == "yes"
             go_reward = 10_000_000 if is_gp_halved else 20_000_000
@@ -1873,8 +1874,6 @@ class MonopolyCog(commands.Cog):
                         new_pos = 38 if current_tile != 12 else 28
                     elif new_pos == 38: 
                         if current_tile != 12:
-                            new_pos = 12
-                            if current_tile != 12:
                             new_pos = 12
                             glider_go_msg = await self.process_manual_pass_go(team_name, team_row_index, all_records[team_row_index-2])
                             go_message = f"<:gnome_glider:1559011826442838066> **GLIDER FLIGHT OVER GO!**{glider_go_msg}"
@@ -5570,6 +5569,7 @@ class MonopolyCog(commands.Cog):
                         available_cards.append({"type": "virtual", "data": {"Name": "Phoenix Necklace"}})
                         available_cards.append({"type": "virtual", "data": {"Name": "Ring of Charos"}})
                         available_cards.append({"type": "virtual", "data": {"Name": "Ring of Stone"}})
+                        available_cards.append({"type": "virtual", "data": {"Name": "Ring of Wealth"}})
                         
                     if available_cards:
                         drawn_card = random.choice(available_cards)
@@ -5602,6 +5602,7 @@ class MonopolyCog(commands.Cog):
                         available_cards.append({"type": "virtual", "data": {"Name": "Phoenix Necklace"}})
                         available_cards.append({"type": "virtual", "data": {"Name": "Ring of Charos"}})
                         available_cards.append({"type": "virtual", "data": {"Name": "Ring of Stone"}})
+                        available_cards.append({"type": "virtual", "data": {"Name": "Ring of Wealth"}})
                         
                     if available_cards:
                         drawn_card = random.choice(available_cards)
@@ -5648,6 +5649,7 @@ class MonopolyCog(commands.Cog):
                         unowned_cards.append({"type": "virtual", "data": {"Name": "Phoenix Necklace"}})
                         unowned_cards.append({"type": "virtual", "data": {"Name": "Ring of Charos"}})
                         unowned_cards.append({"type": "virtual", "data": {"Name": "Ring of Stone"}})
+                        unowned_cards.append({"type": "virtual", "data": {"Name": "Ring of Wealth"}})
                     
                     if not unowned_cards:
                         await asyncio.to_thread(self.increment_rolls_available, chosen_team)
