@@ -1018,14 +1018,22 @@ class MonopolyCog(commands.Cog):
                         
                         is_gp_halved = False
                         is_gp_doubled = False
+                        has_wealth = False
                         if team_record:
                             is_gp_halved = str(team_record.get("GP Halved", "no")).strip().lower() == "yes"
                             is_gp_doubled = str(team_record.get("GP Doubled", "no")).strip().lower() == "yes"
+                            has_wealth = str(team_record.get("Ring of Wealth", "no")).strip().lower() == "yes"
                             
                         if is_gp_doubled:
                             final_gp_value = final_gp_value * 2
                         if is_gp_halved:
                             final_gp_value = final_gp_value // 2
+                            
+                        row_bonus = 0
+                        if has_wealth:
+                            row_bonus = int(final_gp_value * 0.25)
+                            final_gp_value += row_bonus
+                            await self.cog.consume_ring_of_wealth(team_name)
                             
                         original_gp_value_pre_tax = final_gp_value
 
@@ -1034,9 +1042,11 @@ class MonopolyCog(commands.Cog):
                             emoji = CARD_EMOJIS.get(consumed_card_name, "")
                             bonus_parts.append(f"x{gp_multiplier} from {emoji} **{consumed_card_name}**")
                         if is_gp_doubled:
-                            bonus_parts.append("Doubled by 🎯 **Pinball Troll**")
+                            bonus_parts.append("Doubled by <:flippa:1559002523422163024> **Pinball Troll**")
                         if is_gp_halved:
                             bonus_parts.append("Halved by <:ent:1558999589317640262> **The Ents**")
+                        if has_wealth:
+                            bonus_parts.append(f"+{row_bonus:,} GP from <:ring_of_wealth:1559360652210868234> **Ring of Wealth**")
                             
                         alchemy_bonus = f" ({', '.join(bonus_parts)}!)" if bonus_parts else ""
 
@@ -1301,9 +1311,10 @@ class MonopolyCog(commands.Cog):
                         hpn = str(t_info.get("Phoenix Necklace", "no")).strip().lower() == "yes"
                         hc = str(t_info.get("Ring of Charos", "no")).strip().lower() == "yes"
                         hs = str(t_info.get("Ring of Stone", "no")).strip().lower() == "yes"
+                        hw = str(t_info.get("Ring of Wealth", "no")).strip().lower() == "yes"
 
-                        if not (hp or hr or hpn or hc or hs):
-                            passive_choices = ["Protect Item", "Ring of Recoil", "Phoenix Necklace", "Ring of Charos", "Ring of Stone"]
+                        if not (hp or hr or hpn or hc or hs or hw):
+                            passive_choices = ["Protect Item", "Ring of Recoil", "Phoenix Necklace", "Ring of Charos", "Ring of Stone", "Ring of Wealth"]
                             chosen_passive = random.choice(passive_choices)
                             
                             headers = list(all_recs[0].keys())
@@ -1317,7 +1328,8 @@ class MonopolyCog(commands.Cog):
                                     "Ring of Recoil": "<:recoil:1558985588055609374>", 
                                     "Phoenix Necklace": "<:pneck:1558990483110367242>", 
                                     "Ring of Charos": "<:charos:1558985798483837049>",
-                                    "Ring of Stone": "<:ring_of_stone:1558985677134241873>"
+                                    "Ring of Stone": "<:ring_of_stone:1558985677134241873>",
+                                    "Ring of Wealth": "<:ring_of_wealth:1559360652210868234>"
                                 }
                                 p_emoji = emoji_map.get(chosen_passive, "💎")
                                 
@@ -1326,13 +1338,14 @@ class MonopolyCog(commands.Cog):
                                     "Ring of Recoil": "Passive - Affects triggered on you are also triggered to the attacker.",
                                     "Phoenix Necklace": "Passive - Automatically shatters to absorb your next rent payment.",
                                     "Ring of Charos": "Passive - Automatically halves the cost of your next house purchase.",
-                                    "Ring of Stone": "Passive - Automatically shatters to block forced movement or teleports."
+                                    "Ring of Stone": "Passive - Automatically shatters to block forced movement or teleports.",
+                                    "Ring of Wealth": "Passive - Automatically grants a +25% bonus to your next approved drop payout before shattering."
                                 }
                                 card_text = passive_descriptions.get(chosen_passive, "")
                                 display_name = "Protect Item Scroll" if chosen_passive == "Protect Item" else ("Ring of Charos (a)" if chosen_passive == "Ring of Charos" else chosen_passive)
                                 
                                 rdt_embed = discord.Embed(
-                                    title="💎 Rare Drop Table Hit!",
+                                    title="💎 Rare Drop Table!",
                                     description=(
                                         f"**{team_name}** got lucky on the RDT!\n"
                                         f"Along with your boss drop, you found a **{display_name}**!\n\n"
@@ -1343,6 +1356,7 @@ class MonopolyCog(commands.Cog):
                                 )
                                 if team_chan:
                                     await team_chan.send(embed=rdt_embed)
+                
                 except Exception as rdt_err:
                     print(f"❌ Error during RDT roll: {rdt_err}")
 
@@ -2738,8 +2752,9 @@ class MonopolyCog(commands.Cog):
             has_phoenix = str(team_info.get("Phoenix Necklace", "no")).strip().lower() == "yes"
             has_charos = str(team_info.get("Ring of Charos", "no")).strip().lower() == "yes"
             has_stone = str(team_info.get("Ring of Stone", "no")).strip().lower() == "yes"
+            has_wealth = str(team_info.get("Ring of Wealth", "no")).strip().lower() == "yes"
             
-            has_any_passive = has_protect_item or has_recoil or has_phoenix or has_charos or has_stone
+            has_any_passive = has_protect_item or has_recoil or has_phoenix or has_charos or has_stone or has_wealth
 
             eligible_cards = []
             if rows:
@@ -2762,6 +2777,7 @@ class MonopolyCog(commands.Cog):
                 eligible_cards.append({"type": "virtual", "data": {"Name": "Phoenix Necklace", "Card Text": "Passive - Can't be used. Automatically shatters to absorb your next rent payment."}})
                 eligible_cards.append({"type": "virtual", "data": {"Name": "Ring of Charos", "Card Text": "Passive - Can't be used. Automatically halves the cost of your next house purchase."}})
                 eligible_cards.append({"type": "virtual", "data": {"Name": "Ring of Stone", "Card Text": "Passive - Can't be used. Automatically shatters to block forced movement or teleports."}})
+                eligible_cards.append({"type": "virtual", "data": {"Name": "Ring of Wealth", "Card Text": "Passive - Can't be used. Automatically grants a +25% bonus to your next approved drop payout before shattering."}})
 
             if not eligible_cards:
                 await team_channel.send(f"❗ **{team_name}** tried to draw a {card_type} card, but they already hold every available card in the deck!")
@@ -2784,6 +2800,8 @@ class MonopolyCog(commands.Cog):
                 card_emoji = "<:charos:1558985798483837049>"
             elif card_name == "Ring of Stone":
                 card_emoji = "<:ring_of_stone:1558985677134241873>"
+            elif card_name == "Ring of Wealth":
+                card_emoji = "<:ring_of_wealth:1559360652210868234>"
             else:
                 card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "🃏"))
             
@@ -2812,7 +2830,8 @@ class MonopolyCog(commands.Cog):
                     await team_channel.send(f"<:charos:1558985798483837049> **{team_name}** drew a **Ring of Charos (a)**!\nThe ring is now **ACTIVE** in your inventory and will halve the cost of your next house purchase!")
                 elif card_name == "Ring of Stone":
                     await team_channel.send(f"<:ring_of_stone:1558985677134241873> **{team_name}** drew a **Ring of Stone**!\nThe ring is now **ACTIVE** in your inventory and will prevent the next card effect that tries to move or teleport you!")
-
+                elif card_name == "Ring of Wealth":
+                    await team_channel.send(f"<:ring_of_wealth:1559360652210868234> **{team_name}** drew a **Ring of Wealth**!\nThe ring is now **ACTIVE** in your inventory and will grant a **+25% GP bonus** on your next approved boss drop!")
             else:
                 card_row_index = chosen_card["index"]
                 teams_holding = chosen_card["teams_holding"]
@@ -3141,6 +3160,21 @@ class MonopolyCog(commands.Cog):
         except Exception as e:
             print(f"❌ Error consuming Ring of Charos for {team_name}: {e}")
 
+    async def consume_ring_of_wealth(self, team_name: str):
+        """Shatters the Ring of Wealth after applying its GP bonus."""
+        try:
+            records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+            headers = list(records[0].keys()) if records else []
+            if "Ring of Wealth" in headers:
+                team_info = next((r for r in records if str(r.get("Team", "")).strip().lower() == team_name.strip().lower()), None)
+                if team_info:
+                    team_row_idx = records.index(team_info) + 2
+                    col_idx = headers.index("Ring of Wealth") + 1
+                    await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, col_idx, "no")
+                    print(f"✅ Ring of Wealth consumed for {team_name}.")
+        except Exception as e:
+            print(f"❌ Error consuming Ring of Wealth for {team_name}: {e}")
+    
     async def consume_ring_of_stone(self, team_name: str):
         """Shatters the Ring of Stone after preventing forced movement."""
         try:
@@ -3383,11 +3417,12 @@ class MonopolyCog(commands.Cog):
             has_phoenix = str(team_record.get("Phoenix Necklace", "no")).strip().lower() == "yes"
             has_charos = str(team_record.get("Ring of Charos", "no")).strip().lower() == "yes"
             has_stone = str(team_record.get("Ring of Stone", "no")).strip().lower() == "yes"
+            has_wealth = str(team_record.get("Ring of Wealth", "no")).strip().lower() == "yes"
         except Exception as e:
             print(f"❌ Error fetching passives status: {e}")
             is_protected, has_recoil, has_phoenix, has_charos, has_stone = False, False, False, False, False
 
-        if not chest_cards and not chance_cards and not is_protected and not has_recoil and not has_phoenix and not has_charos and not has_stone:
+        if not chest_cards and not chance_cards and not is_protected and not has_recoil and not has_phoenix and not has_charos and not has_stone and not has_wealth:
             await interaction.followup.send("❌ Your team holds no cards and has no active passives.", ephemeral=True)
             return
 
@@ -3408,7 +3443,8 @@ class MonopolyCog(commands.Cog):
             passives_text += "<:charos:1558985798483837049> **Ring of Charos (a)**\n*This ring will automatically charm the real estate agent into giving you a 50% discount on your next house purchase.*\n\n"
         if has_stone:
             passives_text += "<:ring_of_stone:1558985677134241873> **Ring of Stone**\n*This ring turns you into a heavy rock, preventing the next card effect that attempts to forcefully move or teleport you.*\n\n"
-
+        if has_wealth:
+            passives_text += "<:ring_of_wealth:1559360652210868234> **Ring of Wealth**\n*This ring gleams with greed! Automatically grants a +25% GP bonus to your next approved boss drop before shattering.*\n\n"
         if passives_text:
             embed.add_field(
                 name="<:passive:1558986754403336235> Passives <:passive:1558986754403336235>",
@@ -5477,8 +5513,9 @@ class MonopolyCog(commands.Cog):
                 has_phoenix = str(team_info.get("Phoenix Necklace", "no")).strip().lower() == "yes"
                 has_charos = str(team_info.get("Ring of Charos", "no")).strip().lower() == "yes"
                 has_stone = str(team_info.get("Ring of Stone", "no")).strip().lower() == "yes"
+                has_wealth = str(team_info.get("Ring of Wealth", "no")).strip().lower() == "yes"
             
-                has_any_passive = has_protect or has_recoil or has_phoenix or has_charos or has_stone
+                has_any_passive = has_protect or has_recoil or has_phoenix or has_charos or has_stone or has_wealth
 
                 if chosen_buff == "certers":
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 20_000_000)
@@ -5544,6 +5581,7 @@ class MonopolyCog(commands.Cog):
                             available_cards.append({"type": "virtual", "data": {"Name": "Phoenix Necklace"}})
                             available_cards.append({"type": "virtual", "data": {"Name": "Ring of Charos"}})
                             available_cards.append({"type": "virtual", "data": {"Name": "Ring of Stone"}})
+                            available_cards.append({"type": "virtual", "data": {"Name": "Ring of Wealth"}})
                             
                         if available_cards:
                             drawn_card = random.choice(available_cards)
@@ -5566,6 +5604,8 @@ class MonopolyCog(commands.Cog):
                                         embed_desc += f"\n\n<:charos:1558985798483837049> The **Ring of Charos (a)** is now **ACTIVE** in your inventory!"
                                     elif drawn_card_name == "Ring of Stone":
                                         embed_desc += f"\n\n<:ring_of_stone:1558985677134241873> The **Ring of Stone** is now **ACTIVE** in your inventory!"
+                                    elif drawn_card_name == "Ring of Wealth":
+                                        embed_desc += f"\n\n<:ring_of_wealth:1559360652210868234> The **Ring of Wealth** is now **ACTIVE** in your inventory!"
                             else:
                                 card_idx = drawn_card["index"]
                                 current_holders = [t.strip() for t in str(drawn_card["data"].get("Held By Team", "")).split(",") if t.strip()]
