@@ -65,6 +65,8 @@ CARD_EMOJIS = {
     "Smite": "<:smite:1558986008404697199>",
     "Tele Other": "<:teleother:1558985957561213000>",
     "Entangle": "<:entangle:1559357859349667890>",
+    "Stamina Potion": "<:stamina_potion:1559367737623707688>",
+    "Sanfew Serum": "<:sanfew_serum:1559371274588004402>",
     "Tele Block": "<:teleblock:1558985901831364710>",
     "Chest": "<:chest:1558985858516787251>",
     "Chance": "<:chance:1558993615152353360>"
@@ -3605,6 +3607,70 @@ class MonopolyCog(commands.Cog):
                 
                 embed_description = "> The next negative card effect used on your team will be fizzled."
 
+            elif card_name == "Sanfew Serum":
+                team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+                t_info = next((r for r in team_records if str(r.get("Team", "")).strip().lower() == team_name.strip().lower()), None)
+
+                cleansed = []
+                if t_info:
+                    if str(t_info.get("Poisoned Roll", "no")).strip().lower() == "yes":
+                        await asyncio.to_thread(self.clear_flag_column, team_name, "Poisoned Roll")
+                        cleansed.append("Cured **Poison** (Roll cap removed)")
+
+                    if str(t_info.get("GP Halved", "no")).strip().lower() == "yes":
+                        await asyncio.to_thread(self.clear_flag_column, team_name, "GP Halved")
+                        cleansed.append("Dispelled **Ent Curse** (100% GP income restored)")
+
+                    if str(t_info.get("Teleblocked", "no")).strip().lower() == "yes":
+                        await asyncio.to_thread(self.set_teleblock_status, team_name, "no")
+                        cleansed.append("Dissolved **Tele Block**")
+
+                desc_lines = ["> <:sanfew_serum:1559371274588004402> Consumed a **Sanfew Serum**!"]
+                if cleansed:
+                    desc_lines.extend([f"> • {item}" for item in cleansed])
+                else:
+                    desc_lines.append("> • *No active status debuffs were present.*")
+
+                embed_description = "\n".join(desc_lines)
+            
+            elif card_name == "Stamina Potion":
+                team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+                headers = list(team_records[0].keys())
+                t_info = next((r for r in team_records if str(r.get("Team", "")).strip().lower() == team_name.strip().lower()), None)
+
+                cleansed = []
+                if t_info:
+                    rp_val = str(t_info.get("Roll Penalty", "")).strip().lower()
+                    if rp_val and rp_val not in ("0", "no"):
+                        await asyncio.to_thread(self.clear_flag_column, team_name, "Roll Penalty")
+                        cleansed.append("Cleansed **Fatigue** (Roll Penalty)")
+
+                    if str(t_info.get("Roll Halved", "no")).strip().lower() == "yes":
+                        await asyncio.to_thread(self.clear_flag_column, team_name, "Roll Halved")
+                        cleansed.append("Cleansed **Exhaustion** (Roll Halved)")
+
+                    if "Roll Bonus" in headers:
+                        t_row_idx = team_records.index(t_info) + 2
+                        rb_col_idx = headers.index("Roll Bonus") + 1
+
+                        try:
+                            current_rb_raw = str(t_info.get("Roll Bonus", "0")).strip()
+                            current_rb = int(current_rb_raw) if current_rb_raw.isdigit() else (3 if current_rb_raw.lower() == "yes" else 0)
+                        except Exception:
+                            current_rb = 0
+
+                        new_bonus = current_rb + 1
+                        await asyncio.to_thread(self.team_data_sheet.update_cell, t_row_idx, rb_col_idx, str(new_bonus))
+
+                desc_lines = ["> <:stamina_potion:1559367737623707688> Consumed a **Stamina Potion**! Your run energy has been restored."]
+                if cleansed:
+                    desc_lines.extend([f"> • {item}" for item in cleansed])
+                else:
+                    desc_lines.append("> • *No active fatigue debuffs were present.*")
+                desc_lines.append("> • Granted a **+1 bonus** to your next dice roll.")
+
+                embed_description = "\n".join(desc_lines)
+            
             elif card_name == "Elder Maul":
                 if team_wildcard_value == "active":
                     await interaction.followup.send("❌ This card is already active!", ephemeral=True)
