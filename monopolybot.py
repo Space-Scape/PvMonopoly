@@ -2368,6 +2368,77 @@ class MonopolyCog(commands.Cog):
             print(f"❌ Error in /stats command: {e}")
             await interaction.followup.send("❌ Error fetching status.", ephemeral=True)
 
+    @app_commands.command(name="leaderboard", description="Publicly view the tournament top 3 for Go Passes, GP, and Houses.")
+    async def leaderboard(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+            team_records = [r for r in records if r.get("Team")]
+            if not team_records:
+                await interaction.followup.send("❌ No team data available.", ephemeral=True)
+                return
+
+            gp_list = []
+            passes_list = []
+            houses_list = []
+
+            for r in team_records:
+                team_name = str(r.get("Team", "")).strip()
+                if not team_name:
+                    continue
+
+                try:
+                    gp_val = int(str(r.get("GP", 0)).replace(',', '').strip() or 0)
+                except Exception:
+                    gp_val = 0
+
+                try:
+                    passes_val = int(str(r.get("Go Passes", 0)).replace(',', '').strip() or 0)
+                except Exception:
+                    passes_val = 0
+
+                try:
+                    houses_val = int(str(r.get("Houses Owned", 0)).replace(',', '').strip() or 0)
+                except Exception:
+                    houses_val = 0
+
+                gp_list.append({"team": team_name, "value": gp_val})
+                passes_list.append({"team": team_name, "value": passes_val})
+                houses_list.append({"team": team_name, "value": houses_val})
+
+            passes_list.sort(key=lambda x: x["value"], reverse=True)
+            gp_list.sort(key=lambda x: x["value"], reverse=True)
+            houses_list.sort(key=lambda x: x["value"], reverse=True)
+
+            medals = ["<:gold:1559816429044236339>", "<:silver:1559816420945170543>", "<:bronze:1559816412456030258>"]
+
+            def build_top_3(entries: list, suffix: str = "") -> str:
+                lines = []
+                for i, entry in enumerate(entries[:3]):
+                    medal = medals[i] if i < len(medals) else f"**{i+1}.**"
+                    lines.append(f"{medal} **{entry['team']}**: {entry['value']:,}{suffix}")
+                return "\n".join(lines) if lines else "*No data*"
+
+            passes_display = build_top_3(passes_list)
+            gp_display = build_top_3(gp_list, " GP")
+            houses_display = build_top_3(houses_list)
+
+            embed = discord.Embed(
+                title="<:stats:1559814578278371338> Tournament Leaderboard",
+                description="Current standings across all teams.",
+                color=discord.Color.gold()
+            )
+            embed.add_field(name="<:go:1559018777343950848> Go Passes", value=passes_display, inline=True)
+            embed.add_field(name="<:MaxCash:1558959942394847372> GP Vault", value=gp_display, inline=True)
+            embed.add_field(name="<:pohvoucher:1558986290895003780> Houses Owned", value=houses_display, inline=True)
+
+            await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            print(f"❌ Error in /leaderboard command: {e}")
+            traceback.print_exc()
+            await interaction.followup.send("❌ An error occurred while compiling the leaderboard.", ephemeral=True)
+    
     @app_commands.command(name="buy_house", description="Attempt to buy a house on your current tile.")
     async def buy_house(self, interaction: discord.Interaction):
         if str(interaction.channel_id) not in TEAM_CHANNEL_IDS_AS_STR:
