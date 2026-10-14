@@ -68,6 +68,7 @@ CARD_EMOJIS = {
     "Stamina Potion": "<:stamina_potion:1559367737623707688>",
     "Sanfew Serum": "<:sanfew_serum:1559371274588004402>",
     "Tele Block": "<:teleblock:1558985901831364710>",
+    "Mithril Seeds": "<:mithril_seeds:1559878504194117744>",
     "Chest": "<:chest:1558985858516787251>",
     "Chance": "<:chance:1558993615152353360>"
 }
@@ -3655,6 +3656,44 @@ class MonopolyCog(commands.Cog):
                     desc_lines.append("> • *No active status debuffs were present.*")
 
                 embed_description = "\n".join(desc_lines)
+
+            elif card_name == "Mithril Seeds":
+                all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+                caster_pos = -1
+                team_row_idx = -1
+                team_record = None
+                
+                for idx, record in enumerate(all_teams_data, start=2):
+                    if record.get("Team") == team_name:
+                        caster_pos = int(record.get("Position", -1))
+                        team_row_idx = idx
+                        team_record = record
+                        break
+                
+                if caster_pos == -1:
+                    await interaction.followup.send("❌ Could not find your team's position.", ephemeral=True)
+                    return
+
+                if caster_pos == 10:
+                    await interaction.followup.send("❌ You cannot use **Mithril Seeds** while on tile 10 (Nex/Gauntlet/Jail).", ephemeral=True)
+                    return
+                
+                raw_new_pos = caster_pos + 1
+                intended_pos = raw_new_pos % BOARD_SIZE
+                new_pos = self.resolve_nonroll_landing_tile(intended_pos)
+
+                go_msg = ""
+                if raw_new_pos >= BOARD_SIZE and new_pos != 30:
+                    go_msg = await self.process_manual_pass_go(team_name, team_row_idx, team_record)
+                    
+                await asyncio.to_thread(self.log_command, team_name, "/card_effect_set_tile", {"team": team_name, "tile": new_pos})
+                
+                destination_tile_name = self.get_tile_name_for_display(new_pos)
+                embed_description = f"> <:mithril_seeds:1559878504194117744> Planted **Mithril Seeds** and stepped exactly 1 tile forward!\n> You are now on the **{destination_tile_name}** tile (Tile **{new_pos}**).{go_msg}"
+                embed_description += self.get_glider_redirect_note(intended_pos, new_pos)
+
+                await self.check_and_award_card_on_land(team_name, new_pos, "stepping to")
+                await self.auto_post_show_drops_if_boss_tile(team_name, new_pos)
             
             elif card_name == "Stamina Potion":
                 team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
