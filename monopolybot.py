@@ -1914,7 +1914,10 @@ class MonopolyCog(commands.Cog):
             roll_status_details.append(f"<:sergeant_damien:1558999790556028998> *The Demon's exhaustion cut your roll to **{result}**!*")
         
         if roll_penalty > 0:
-            roll_status_details.append(f"<:leo:1558999609601294346> *The Gravedigger's fatigue reduced your roll to **{result}**!*")
+            if rp_raw == "yes":
+                roll_status_details.append(f"<:leo:1558999609601294346> *The Gravedigger's fatigue reduced your roll to **{result}**!*")
+            else:
+                roll_status_details.append(f"<:entangle:1559357859349667890> *Entangling roots reduced your roll to **{result}**!*")
             
         if roll_bonus > 0:
             roll_status_details.append(f"<:sandwich_lady:1558999634096037898> *The Sandwich Lady's snack boosted your roll to **{result}**!*")
