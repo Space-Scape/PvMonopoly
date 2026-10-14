@@ -3528,6 +3528,34 @@ class MonopolyCog(commands.Cog):
                 
                 embed_description = "> The next negative card effect used on your team will be fizzled."
 
+            elif card_name == "Entangle":
+                all_teams_data = await asyncio.to_thread(self.team_data_sheet.get_all_records)
+                valid_targets = [
+                    record.get("Team")
+                    for record in all_teams_data
+                    if record.get("Team") and record.get("Team") != team_name
+                ]
+
+                if not valid_targets:
+                    await interaction.followup.send("❌ Card effect failed: No opponents to Entangle.", ephemeral=True)
+                    return 
+
+                embed = discord.Embed(
+                    title="<:entangle:1559357859349667890> Target Selection: Entangle",
+                    description="Select an opposing team to entangle (-2 to their next roll)!",
+                    color=discord.Color.dark_green()
+                )
+                extra_memory = {
+                    "card_sheet": card_sheet,
+                    "card_row": card_row,
+                    "wildcard_data": wildcard_data,
+                    "team_wildcard_value": team_wildcard_value,
+                    "double_card_note": double_card_note
+                }
+                view = self.CardTargetView(self, team_name, valid_targets, "Entangle", "entangle", extra_data=extra_memory)
+                await interaction.followup.send(embed=embed, view=view, ephemeral=False)
+                return
+            
             elif card_name == "Sanfew Serum":
                 team_records = await asyncio.to_thread(self.team_data_sheet.get_all_records)
                 t_info = next((r for r in team_records if str(r.get("Team", "")).strip().lower() == team_name.strip().lower()), None)
@@ -3810,7 +3838,7 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ Card effect failed: No opponents to Tele Block.", ephemeral=True)
                     return 
                 
-                embed = discord.Embed(title="🎯 Target Selection: Tele Block", description="Select a team to Teleblock!", color=discord.Color.dark_purple())
+                embed = discord.Embed(title="<:teleblock:1558985901831364710> Target Selection: Tele Block", description="Select a team to Teleblock!", color=discord.Color.dark_purple())
                 extra_memory = {"card_sheet": card_sheet, "card_row": card_row, "wildcard_data": wildcard_data, "team_wildcard_value": team_wildcard_value, "double_card_note": double_card_note}
                 view = self.CardTargetView(self, team_name, valid_targets, "Tele Block", "tele_block", extra_data=extra_memory)
                 await interaction.followup.send(embed=embed, view=view, ephemeral=False)
@@ -3847,7 +3875,7 @@ class MonopolyCog(commands.Cog):
                 for c in stealable_cards:
                     team_card_counts[c["victim_team"]] = team_card_counts.get(c["victim_team"], 0) + 1
 
-                embed = discord.Embed(title="🎯 Target Selection: Rogue's Gloves", description="Select a team to steal from!", color=discord.Color.dark_gray())
+                embed = discord.Embed(title="<:roguegloves:1558986623486660648> Target Selection: Rogue's Gloves", description="Select a team to steal from!", color=discord.Color.dark_gray())
                 extra_memory = {"card_sheet": card_sheet, "card_row": card_row, "wildcard_data": wildcard_data, "team_wildcard_value": team_wildcard_value, "stealable_cards": stealable_cards, "double_card_note": double_card_note}
                 view = self.CardTargetView(self, team_name, list(team_card_counts.keys()), "Rogue's Gloves", "rogues_gloves", extra_data=extra_memory)
                 await interaction.followup.send(embed=embed, view=view, ephemeral=False)
@@ -3884,7 +3912,7 @@ class MonopolyCog(commands.Cog):
                 for c in smitable_cards:
                     team_card_counts[c["victim_team"]] = team_card_counts.get(c["victim_team"], 0) + 1
 
-                embed = discord.Embed(title="🎯 Target Selection: Smite", description="Select a team to Smite!", color=discord.Color.red())
+                embed = discord.Embed(title="<:smite:1558986008404697199> Target Selection: Smite", description="Select a team to Smite!", color=discord.Color.red())
                 extra_memory = {"card_sheet": card_sheet, "card_row": card_row, "wildcard_data": wildcard_data, "team_wildcard_value": team_wildcard_value, "smitable_cards": smitable_cards, "double_card_note": double_card_note}
                 view = self.CardTargetView(self, team_name, list(team_card_counts.keys()), "Smite", "smite", extra_data=extra_memory)
                 await interaction.followup.send(embed=embed, view=view, ephemeral=False)
@@ -3917,7 +3945,7 @@ class MonopolyCog(commands.Cog):
                     await interaction.followup.send("❌ Card effect failed: No eligible team has GP to steal.", ephemeral=True)
                     return
 
-                embed = discord.Embed(title="🎯 Target Selection: Pickpocket", description="Select a team to pickpocket! Here is the current GP of all eligible targets:\n", color=discord.Color.dark_gold())
+                embed = discord.Embed(title="<:pickpocket:1558986509242212412> Target Selection: Pickpocket", description="Select a team to pickpocket! Here is the current GP of all eligible targets:\n", color=discord.Color.dark_gold())
                 for t in valid_targets: embed.description += f"\n• **{t}**: {target_gp_data[t]:,} GP"
 
                 extra_memory = {"card_sheet": card_sheet, "card_row": card_row, "wildcard_data": wildcard_data, "team_wildcard_value": team_wildcard_value, "all_teams_data": all_teams_data, "caster_record": caster_record, "target_gp_data": target_gp_data, "double_card_note": double_card_note}
