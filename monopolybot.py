@@ -716,6 +716,7 @@ class MonopolyCog(commands.Cog):
                 for _ in range(3):
                     card_type = random.choice(["Chest", "Chance"])
                     await self.team_receives_card(team_name, card_type, team_chan)
+                    await asyncio.sleep(1.5)
             
             if is_gp_halved:
                 asyncio.create_task(asyncio.to_thread(self.clear_flag_column, team_name, "GP Halved"))
@@ -1638,6 +1639,7 @@ class MonopolyCog(commands.Cog):
                 for _ in range(3):
                     card_type = random.choice(["Chest", "Chance"])
                     await self.team_receives_card(team_name, card_type, team_chan)
+                    await asyncio.sleep(1.5)
                     
         await interaction.followup.send("Game started! 3 random cards have been dealt to all teams.")
     
@@ -2359,7 +2361,7 @@ class MonopolyCog(commands.Cog):
             embed.add_field(name="<a:location:1559795612659089468> Location", value=f"Tile {cur_pos}: **{tile_name}**{jail_tag}", inline=False)
             embed.add_field(name="<:MaxCash:1558959942394847372> GP Vault", value=f"**{gp_val:,} GP**", inline=True)
             embed.add_field(name="🎲 Available Rolls", value=f"**{rolls}**", inline=True)
-            embed.add_field(name="<:go:1559018777343950848> Passes", value=f"**{passes}**", inline=True)
+            embed.add_field(name="<:go:1559018777343950848> Go Passes", value=f"**{passes}**", inline=True)
             embed.add_field(name="<:pohvoucher:1558986290895003780> Houses", value=f"**{houses}**", inline=True)
             embed.add_field(name="<:card:1559795580656689222> Cards", value=f"{chest_count} Chest | {chance_count} Chance", inline=True)
             embed.add_field(name="<:passive:1558986754403336235> Active Passives", value=", ".join(passives) if passives else "*None*", inline=True)
@@ -2822,19 +2824,6 @@ class MonopolyCog(commands.Cog):
                     color=discord.Color.purple()
                 )
                 await team_channel.send(embed=embed)
-                
-                if card_name == "Protect Item":
-                    await team_channel.send(f"<:protect_item:1559003530050670632> **{team_name}** drew a **Protect Item Scroll**!\nThe prayer is now **ACTIVE** in your inventory and will automatically block the next effect that steals your GP or cards!")
-                elif card_name == "Ring of Recoil":
-                    await team_channel.send(f"<:recoil:1558985588055609374> **{team_name}** drew a **Ring of Recoil**!\nThe ring is now **ACTIVE** in your inventory and will force the next team that attacks you to suffer the same fate!")
-                elif card_name == "Phoenix Necklace":
-                    await team_channel.send(f"<:pneck:1558990483110367242> **{team_name}** drew a **Phoenix Necklace**!\nThe necklace is now **ACTIVE** in your inventory and will absorb the next rent payment you owe!")
-                elif card_name == "Ring of Charos":
-                    await team_channel.send(f"<:charos:1558985798483837049> **{team_name}** drew a **Ring of Charos (a)**!\nThe ring is now **ACTIVE** in your inventory and will halve the cost of your next house purchase!")
-                elif card_name == "Ring of Stone":
-                    await team_channel.send(f"<:ring_of_stone:1558985677134241873> **{team_name}** drew a **Ring of Stone**!\nThe ring is now **ACTIVE** in your inventory and will prevent the next card effect that tries to move or teleport you!")
-                elif card_name == "Ring of Wealth":
-                    await team_channel.send(f"<:ring_of_wealth:1559360652210868234> **{team_name}** drew a **Ring of Wealth**!\nThe ring is now **ACTIVE** in your inventory and will grant a **+25% GP bonus** on your next approved boss drop!")
             else:
                 card_row_index = chosen_card["index"]
                 teams_holding = chosen_card["teams_holding"]
@@ -2869,8 +2858,9 @@ class MonopolyCog(commands.Cog):
                 await team_channel.send(embed=embed) 
 
         except Exception as e:
-            print(f"❌ Error in team_receives_card: {e}")
+            print(f"❌ Error in team_receives_card for {team_name} ({card_type}): {e}")
             traceback.print_exc()
+            await team_channel.send(f"⚠️ **Error drawing {card_type} card:** `{e}`")
             
     def get_held_cards(self, sheet_obj, team_name: str):
         cards = []
