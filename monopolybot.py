@@ -1230,13 +1230,13 @@ class MonopolyCog(commands.Cog):
                                 
                                 if house_on_current:
                                     await asyncio.to_thread(self.cog.house_data_sheet.update_cell, house_on_current[0], house_count_col, 0)
-                                    tax_msg = f"🏠 **Skip Tax:** You forfeited your property rights here. The house you built on Tile {current_tile} was instantly **destroyed**!"
+                                    tax_msg = f"<:houseicon:1558969589390508112> **Skip Tax:** You forfeited your property rights here. The house you built on Tile {current_tile} was instantly **destroyed**!"
                                 elif any_other_house:
                                     new_count = any_other_house[1] - 1
                                     await asyncio.to_thread(self.cog.house_data_sheet.update_cell, any_other_house[0], house_count_col, new_count)
-                                    tax_msg = "🏠 **Skip Tax:** Since you didn't have a house on this tile, the Bank **repossessed 1 house** from another property you own!"
+                                    tax_msg = "<:houseicon:1558969589390508112> **Skip Tax:** Since you didn't have a house on this tile, the Bank **repossessed 1 house** from another property you own!"
                                 else:
-                                    tax_msg = "🏠 **Skip Tax:** You own zero houses, so the Bank couldn't repossess anything! (However, you forfeit the right to build on this tile for your current turn)."
+                                    tax_msg = "<:houseicon:1558969589390508112> **Skip Tax:** You own zero houses, so the Bank couldn't repossess anything! (However, you forfeit the right to build on this tile for your current turn)."
 
                                 bingo_embed = discord.Embed(
                                     title="<:quest:1559017087723241593> SCAVENGING COMPLETED! <:quest:1559017087723241593>",
@@ -1530,7 +1530,7 @@ class MonopolyCog(commands.Cog):
             await interaction.response.send_message(f"❌ Added to live memory, but failed to save to sheet: {e}", ephemeral=True)
             return
             
-        await interaction.response.send_message(f"✅ Successfully added **{team_name}** to the game!\n📍 **Channel:** {channel.mention}\n⚠️ *Important: Don't forget to manually add a row for '{team_name}' in the `TeamData` Google Sheet!*", ephemeral=True)
+        await interaction.response.send_message(f"✅ Successfully added **{team_name}** to the game!\n<a:location:1559795612659089468> **Channel:** {channel.mention}\n⚠️ *Important: Don't forget to manually add a row for '{team_name}' in the `TeamData` Google Sheet!*", ephemeral=True)
 
     @app_commands.command(name="remove_team", description="[Staff] Dynamically remove a team from the game.")
     @app_commands.describe(role="The Discord role of the team to remove")
@@ -2236,7 +2236,7 @@ class MonopolyCog(commands.Cog):
                 color=discord.Color.orange()
             )
             embed2.add_field(
-                name="🗺️ Special Board Tiles",
+                name="<:gnome_glider:1559011826442838066> Special Board Tiles",
                 value=(
                     "**GO:** Passing GO grants **20M GP** and **3 Cards**. Landing directly ON GO grants a **Free Roll**!\n"
                     "**Gliders:** Landing on a Glider tile automatically charges an **8M GP** fee and flies your team to the next Glider. If you can't afford it, you stay put and get a Free Roll.\n"
@@ -2245,27 +2245,27 @@ class MonopolyCog(commands.Cog):
                 inline=False
             )
             embed2.add_field(
-                name="🏠 Houses & Taxes",
+                name="<:houseicon:1558969589390508112> Houses & Taxes",
                 value="When you land on a boss tile, your Captain can buy a house (up to 4 per tile). If another team lands on your property and gets a drop, they pay you a massive percentage of their earnings as tax!",
                 inline=False
             )
             embed2.add_field(
-                name="🃏 Cards & PvP",
+                name="<:card:1559795580656689222> Cards & PvP",
                 value="Landing on Chest or Chance tiles grants your team a card. Captains can use these to teleport, boost GP, or ruthlessly attack and steal from other teams! Teams can only use one card per turn.",
                 inline=False
             )
             embed2.add_field(
-                name="💎 Rare Drop Table (Passives)",
+                name="<:passive:1558986754403336235> Rare Drop Table (Passives)",
                 value="Every approved drop has a chance to roll on the Rare Drop Table. You can win powerful passive items (like a Ring of Recoil or Protect Item) that automatically defend your team from attacks or taxes. You can only hold **ONE** passive at a time!",
                 inline=False
             )
             embed2.add_field(
-                name=" Scavenging (Off-Board Bosses)",
+                name="<:inventory:1558987548788007002> Scavenging (Off-Board Bosses)",
                 value="Don't want to hunt the boss on your current tile? Use `/scavenge` to hunt off-board bosses (Vorkath, DKS, Sarachnis, Giant Mole) instead! Completing all 4 grants a **Free Roll**, but triggers the Bank's **Skip Tax**, which destroys or repossesses one of your houses!",
                 inline=False
             )
             embed2.add_field(
-                name="🎲 Random Events",
+                name="<:mystery_box:1559004276175536128> Random Events",
                 value="Every time you roll the dice, there is a chance to trigger a Random Event. Some will bless your team, while others will sabotage you.",
                 inline=False
             )
@@ -2322,7 +2322,7 @@ class MonopolyCog(commands.Cog):
             cur_pos = int(team_data.get("Position", 0) or 0)
             is_jailed = str(team_data.get("In Jail", "no")).strip().lower() == "yes"
             tile_name = self.get_tile_name_for_display(cur_pos)
-            jail_tag = " ⛓️ **(In Jail)**" if (cur_pos == 10 and is_jailed) else ""
+            jail_tag = " <:jail:1559419630034886797> **(In Jail)**" if (cur_pos == 10 and is_jailed) else ""
 
             gp_val = int(str(team_data.get("GP", 0)).replace(',', '').strip() or 0)
             rolls = int(str(team_data.get("Rolls Available", 0)).replace(',', '').strip() or 0)
@@ -2348,19 +2348,19 @@ class MonopolyCog(commands.Cog):
 
             # Embed Build
             embed = discord.Embed(
-                title=f"🛡️ {team_name} Status",
+                title=f"<:defence:1559009393884925952> {team_name} Status",
                 color=self._get_game_log_team_color(team_name)
             )
-            embed.add_field(name="📍 Location", value=f"Tile {cur_pos}: **{tile_name}**{jail_tag}", inline=False)
+            embed.add_field(name="<a:location:1559795612659089468> Location", value=f"Tile {cur_pos}: **{tile_name}**{jail_tag}", inline=False)
             embed.add_field(name="<:MaxCash:1558959942394847372> GP Vault", value=f"**{gp_val:,} GP**", inline=True)
             embed.add_field(name="🎲 Available Rolls", value=f"**{rolls}**", inline=True)
             embed.add_field(name="<:go:1559018777343950848> Passes", value=f"**{passes}**", inline=True)
             embed.add_field(name="<:pohvoucher:1558986290895003780> Houses", value=f"**{houses}**", inline=True)
-            embed.add_field(name="🃏 Cards", value=f"{chest_count} Chest | {chance_count} Chance", inline=True)
-            embed.add_field(name="✨ Active Passives", value=", ".join(passives) if passives else "*None*", inline=True)
+            embed.add_field(name="<:card:1559795580656689222> Cards", value=f"{chest_count} Chest | {chance_count} Chance", inline=True)
+            embed.add_field(name="<:passive:1558986754403336235> Active Passives", value=", ".join(passives) if passives else "*None*", inline=True)
             
             if nerfs:
-                embed.add_field(name="⚠️ Debuffs", value=", ".join(nerfs), inline=False)
+                embed.add_field(name="<:sad:1559798386792865896> Debuffs", value=", ".join(nerfs), inline=False)
 
             await interaction.followup.send(embed=embed)
 
@@ -2564,7 +2564,7 @@ class MonopolyCog(commands.Cog):
             if data["stance"] != requested_stance:
                 other_cmd = "/scavenge" if requested_stance == "main" else "/submitdrop"
                 stance_name = "Main Board" if data["stance"] == "main" else "Scavenger"
-                return False, f"⏳ **Dual-Prevention:** That player has already submitted a drop as a **{stance_name}** for this tile (Tile {current_tile}). They can only use `{other_cmd}` until the team moves!"
+                return False, f"<:hourglass:1559014128046051339> **Dual-Prevention:** That player has already submitted a drop as a **{stance_name}** for this tile (Tile {current_tile}). They can only use `{other_cmd}` until the team moves!"
         
         return True, ""
 
@@ -2726,7 +2726,7 @@ class MonopolyCog(commands.Cog):
             elif card_name == "Ring of Wealth":
                 card_emoji = "<:ring_of_wealth:1559360652210868234>"
             else:
-                card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "🃏"))
+                card_emoji = CARD_EMOJIS.get(card_name, CARD_EMOJIS.get(card_type, "<:card:1559795580656689222>"))
             
             if chosen_card["type"] == "virtual":
                 team_row_idx = team_records.index(team_info) + 2
@@ -3459,7 +3459,7 @@ class MonopolyCog(commands.Cog):
                     return
             else:
                 if has_double_card:
-                    double_card_note = "\n\n🃏 **Double Cards Active!** You still have **1** more card use available this turn!"
+                    double_card_note = "\n\n<:card:1559795580656689222> **Double Cards Active!** You still have **1** more card use available this turn!"
                 
         except Exception as e:
             print(f"❌ Error checking team status flags: {e}")
@@ -4534,7 +4534,7 @@ class MonopolyCog(commands.Cog):
     async def execute_targeted_card_effect(self, interaction: discord.Interaction, team_name: str, target_team: str, card_name: str, action: str, extra_data: dict):        
         embed_description = ""
         victim_channel = self.get_team_channel(target_team)
-        card_emoji = CARD_EMOJIS.get(card_name, "🃏")
+        card_emoji = CARD_EMOJIS.get(card_name, "<:card:1559795580656689222>")
         embed_color = discord.Color.blue()
         double_card_note = extra_data.get("double_card_note", "")
         
@@ -4778,7 +4778,7 @@ class MonopolyCog(commands.Cog):
                 
                 if victim_channel:
                     victim_embed = discord.Embed(
-                        title="‼️ Card Stolen!",
+                        title="<:sad:1559798386792865896> Card Stolen!",
                         description=f"**{team_name}** used **Rogue's Gloves** and stole your **{stolen_card['card_name']}** card!",
                         color=discord.Color.dark_red()
                     )
@@ -5201,7 +5201,7 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         victim_embed = discord.Embed(
                             title="<:recoil:1558985588055609374> Recoil Shattered!", 
-                            description=f"**{team_name}** tried to use **Smite** on you, but your **Ring of Recoil** triggered! Both teams lost a card!\n\n🔴 You lost **{target_card['name']}**.\n🟢 They lost **{caster_card['name']}**.", 
+                            description=f"**{team_name}** tried to use **Smite** on you, but your **Ring of Recoil** triggered! Both teams lost a card!\n\n<:sad:1559798386792865896> You lost **{target_card['name']}**.\n<:happy:1559798567642599444> They lost **{caster_card['name']}**.", 
                             color=discord.Color.green()
                         )
                         await victim_channel.send(embed=victim_embed)
@@ -5227,7 +5227,7 @@ class MonopolyCog(commands.Cog):
                 embed_description += f"> **{victim_team}** lost their **{card_to_remove['name']}** card."
                 
                 if victim_channel:
-                    victim_embed = discord.Embed(title="‼️ Card Lost!", description=f"**{team_name}** used **Smite**! Your team lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
+                    victim_embed = discord.Embed(title="<:sad:1559798386792865896> Card Lost!", description=f"**{team_name}** used **Smite**! Your team lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
                     await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                         
@@ -5322,7 +5322,7 @@ class MonopolyCog(commands.Cog):
             # 🔴 NERF MECHANICS
             # ==========================================
             if event_type == "nerf":
-                event_title = "😈 A Disastrous Random Event Appears!"
+                event_title = "<:sad:1559798386792865896> A Disastrous Random Event Appears!"
                 if chosen_nerf == "dwarf":
                     has_protect = str(team_info.get("Protect Item", "no")).strip().lower() == "yes"
                     if has_protect:
@@ -5460,7 +5460,7 @@ class MonopolyCog(commands.Cog):
             # 🟢 BUFF MECHANICS
             # ==========================================
             else:
-                event_title = "😇 A Blessing Appears!"
+                event_title = "<:happy:1559798567642599444> A Blessing Appears!"
                 chosen_buff = random.choice(buff_pool)
                 
                 has_protect = str(team_info.get("Protect Item", "no")).strip().lower() == "yes"
@@ -5576,7 +5576,7 @@ class MonopolyCog(commands.Cog):
                         drawn_card_name = str(drawn_card["data"].get('Name', '')).strip()
                         display_name = "Protect Item Scroll" if drawn_card_name == "Protect Item" else ("Ring of Charos (a)" if drawn_card_name == "Ring of Charos" else drawn_card_name)
 
-                        embed_desc = f"🏴‍☠️ **Capt' Arnav's Chest!**\n**{chosen_team}** successfully cracked the combination! They have been granted a free **{display_name}**!"
+                        embed_desc = f"<:casket:1559799434550706257> **Capt' Arnav's Chest!**\n**{chosen_team}** successfully cracked the combination! They have been granted a free **{display_name}**!"
                         
                         if drawn_card["type"] == "virtual":
                             embed_desc += await self.apply_virtual_passive(team_row_idx, headers, drawn_card_name)
@@ -5587,7 +5587,7 @@ class MonopolyCog(commands.Cog):
                             await asyncio.to_thread(self.chest_sheet.update_cell, card_idx, 3, ", ".join(current_holders))
                     else:
                         await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, gp_col, current_gp + 10_000_000)
-                        embed_desc = f"🏴‍☠️ **Capt' Arnav's Chest!**\n**{chosen_team}** opened the chest but already has all the cards! They found **10,000,000 GP** instead!"
+                        embed_desc = f"<:casket:1559799434550706257> **Capt' Arnav's Chest!**\n**{chosen_team}** opened the chest but already has all the cards! They found **10,000,000 GP** instead!"
                 
                 elif chosen_buff == "oldman":
                     all_chance = await asyncio.to_thread(self.chance_sheet.get_all_records)
