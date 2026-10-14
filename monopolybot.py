@@ -463,7 +463,8 @@ class MonopolyCog(commands.Cog):
             secret_card_phrases = [
                 'drew a chance card', 'drew a chest card',
                 'received a chance card', 'received a chest card',
-                'tried to draw a chance card', 'tried to draw a chest card'
+                'tried to draw a chance card', 'tried to draw a chest card',
+                'passive item drawn'
             ]
             if any(phrase in text_blob for phrase in secret_card_phrases):
                 return True
@@ -2812,9 +2813,13 @@ class MonopolyCog(commands.Cog):
                     await asyncio.to_thread(self.team_data_sheet.update_cell, team_row_idx, passive_col, "yes")
                     
                 embed = discord.Embed(
-                    title=f"{card_emoji} {card_type} Card Drawn!",
-                    description=f"**{team_name}** drew **{display_name}**!\n\n> {card_text}",
-                    color=discord.Color.gold() if card_type == "Chest" else discord.Color.blue()
+                    title=f"<:passive:1558986754403336235> Passive Item Drawn!",
+                    description=(
+                        f"**{team_name}** drew **{display_name}**!\n\n"
+                        f"> {card_text}\n\n"
+                        f"{card_emoji} This passive is now **ACTIVE** in your inventory!"
+                    ),
+                    color=discord.Color.purple()
                 )
                 await team_channel.send(embed=embed)
                 
