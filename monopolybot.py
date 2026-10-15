@@ -4134,11 +4134,11 @@ class MonopolyCog(commands.Cog):
                     opponent_pos = int(record.get("Position", -1))
                     dist = (opponent_pos - caster_pos) % BOARD_SIZE
                     
-                    if 1 <= dist <= 5:
+                    if 1 <= dist <= 3:
                         opponents_ahead.append((opponent_team_name, opponent_pos, dist))
                 
                 if not opponents_ahead:
-                    await interaction.followup.send("❌ Card effect failed: No opponents are within 5 tiles ahead of you.", ephemeral=True)
+                    await interaction.followup.send("❌ Card effect failed: No opponents are within 3 tiles ahead of you.", ephemeral=True)
                     return 
 
                 sorted_opponents = sorted(opponents_ahead, key=lambda x: x[2])
