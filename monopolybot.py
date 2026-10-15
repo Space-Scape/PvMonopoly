@@ -2355,21 +2355,49 @@ class MonopolyCog(commands.Cog):
             houses = int(str(team_data.get("Houses Owned", 0)).replace(',', '').strip() or 0)
 
             # Cards Held
-            chest_count = len(self.get_held_cards(self.chest_sheet, team_name))
-            chance_count = len(self.get_held_cards(self.chance_sheet, team_name))
+            chest_cards = await asyncio.to_thread(self.get_held_cards, self.chest_sheet, team_name)
+            chance_cards = await asyncio.to_thread(self.get_held_cards, self.chance_sheet, team_name)
+            chest_count = len(chest_cards)
+            chance_count = len(chance_cards)
 
-            # Passives & Statuses
+            # Passives
             passives = [
                 p for p in ["Protect Item", "Ring of Recoil", "Phoenix Necklace", "Ring of Charos", "Ring of Stone", "Ring of Wealth"]
                 if str(team_data.get(p, "no")).strip().lower() == "yes"
             ]
 
+            # Active Buffs (Random Events, Potions & Activated Cards)
+            buffs = []
+            if str(team_data.get("GP Doubled", "no")).strip().lower() == "yes":
+                buffs.append("GP Doubled (2x next drop)")
+            
+            rb_raw = str(team_data.get("Roll Bonus", "0")).strip().lower()
+            rb_val = 3 if rb_raw == "yes" else (int(rb_raw) if rb_raw.isdigit() else 0)
+            if rb_val > 0:
+                buffs.append(f"Roll Bonus (+{rb_val})")
+
+            if str(team_data.get("Double Card", "no")).strip().lower() == "yes":
+                buffs.append("Double Card (2 cards this turn)")
+
+            # Active Debuffs / Nerfs
             nerfs = []
-            if str(team_data.get("Poisoned Roll", "no")).strip().lower() == "yes": nerfs.append("Poisoned (Cap 3)")
-            if str(team_data.get("Roll Halved", "no")).strip().lower() == "yes": nerfs.append("Roll Halved")
-            if str(team_data.get("GP Halved", "no")).strip().lower() == "yes": nerfs.append("GP Halved")
-            if str(team_data.get("Teleblocked", "no")).strip().lower() == "yes": nerfs.append("Teleblocked")
-            if str(team_data.get("Silenced", "no")).strip().lower() == "yes": nerfs.append("Silenced")
+            if str(team_data.get("Poisoned Roll", "no")).strip().lower() == "yes":
+                nerfs.append("Poisoned (Roll capped at 3)")
+            if str(team_data.get("Roll Halved", "no")).strip().lower() == "yes":
+                nerfs.append("Exhausted (Roll halved)")
+            
+            rp_raw = str(team_data.get("Roll Penalty", "0")).strip().lower()
+            rp_val = 3 if rp_raw == "yes" else (int(rp_raw) if rp_raw.isdigit() else 0)
+            if rp_val > 0:
+                source = "Gravedigger" if rp_raw == "yes" else "Entangled"
+                nerfs.append(f"{source} (-{rp_val} to next roll)")
+
+            if str(team_data.get("GP Halved", "no")).strip().lower() == "yes":
+                nerfs.append("Ent Curse (GP halved)")
+            if str(team_data.get("Teleblocked", "no")).strip().lower() == "yes":
+                nerfs.append("Teleblocked")
+            if str(team_data.get("Silenced", "no")).strip().lower() == "yes":
+                nerfs.append("Silenced (Cannot use cards)")
 
             # Embed Build
             embed = discord.Embed(
@@ -2379,20 +2407,19 @@ class MonopolyCog(commands.Cog):
             embed.add_field(name="<a:location:1559795612659089468> Location", value=f"Tile {cur_pos}: **{tile_name}**{jail_tag}", inline=False)
             embed.add_field(name="<:MaxCash:1558959942394847372> GP Vault", value=f"**{gp_val:,} GP**", inline=True)
             embed.add_field(name="🎲 Available Rolls", value=f"**{rolls}**", inline=True)
-            embed.add_field(name="<:go:1559018777343950848> Go Passes", value=f"**{passes}**", inline=True)
+            embed.add_field(name="<:go:1559018777343950848> Passes", value=f"**{passes}**", inline=True)
             embed.add_field(name="<:pohvoucher:1558986290895003780> Houses", value=f"**{houses}**", inline=True)
             embed.add_field(name="<:card:1559795580656689222> Cards", value=f"{chest_count} Chest | {chance_count} Chance", inline=True)
             embed.add_field(name="<:passive:1558986754403336235> Active Passives", value=", ".join(passives) if passives else "*None*", inline=True)
-            
-            if nerfs:
-                embed.add_field(name="<:sad:1559798386792865896> Debuffs", value=", ".join(nerfs), inline=False)
+            embed.add_field(name="<:happy:1559798567642599444> Active Buffs", value=", ".join(buffs) if buffs else "*None*", inline=False)
+            embed.add_field(name="<:sad:1559798386792865896> Active Debuffs", value=", ".join(nerfs) if nerfs else "*None*", inline=False)
 
             await interaction.followup.send(embed=embed)
 
         except Exception as e:
             print(f"❌ Error in /stats command: {e}")
             await interaction.followup.send("❌ Error fetching status.", ephemeral=True)
-
+            
     @app_commands.command(name="leaderboard", description="Publicly view the tournament top 3 for Go Passes, GP, and Houses.")
     async def leaderboard(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)
