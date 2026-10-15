@@ -802,8 +802,9 @@ class MonopolyCog(commands.Cog):
             max_length=1000
         )
 
-        def __init__(self, review_message: discord.Message, submitter: discord.Member, team_mention: str = ""):
+        def __init__(self, cog: 'MonopolyCog', review_message: discord.Message, submitter: discord.Member, team_mention: str = ""):
             super().__init__()
+            self.cog = cog
             self.review_message = review_message
             self.submitter = submitter
             self.team_mention = team_mention
@@ -812,7 +813,11 @@ class MonopolyCog(commands.Cog):
             try:
                 await interaction.response.defer(ephemeral=True)
 
-                embed = self.review_message.embeds[0]
+                # Unlock the player's turn stance so a rejected drop doesn't trap them
+                self.cog.player_stances.pop(self.submitter.id, None)
+
+                target_msg = self.review_message or interaction.message
+                embed = target_msg.embeds[0]
                 embed.color = discord.Color.red()
                 if "[Rejected]" not in embed.title:
                     embed.title += " [Rejected]"
@@ -832,8 +837,7 @@ class MonopolyCog(commands.Cog):
                 else:
                     embed.add_field(name="Rejection Reason", value=self.reason.value, inline=False)
 
-                await self.review_message.delete()
-
+                # Send the rejected embed and reason to LOG_CHANNEL first
                 log_chan = interaction.client.get_channel(int(LOG_CHANNEL))
                 if log_chan:
                     mention = f"{self.team_mention} " if self.team_mention else ""
@@ -847,9 +851,13 @@ class MonopolyCog(commands.Cog):
                 else:
                     print(f"❌ RejectModal: Log channel {LOG_CHANNEL} not found.")
 
-                await interaction.followup.send("✅ Rejection noted and moved to the drop log.", ephemeral=True)
+                # Remove the submission from REVIEW_CHANNEL
+                await target_msg.delete()
+
+                await interaction.followup.send("✅ Rejection logged and removed from the review channel.", ephemeral=True)
             except Exception as e:
                 print(f"❌ Error in RejectModal: {e}")
+                traceback.print_exc()
                 await interaction.followup.send(f"❌ Error processing rejection: {e}", ephemeral=True)
     
     class CardTargetView(discord.ui.View):
@@ -1394,7 +1402,10 @@ class MonopolyCog(commands.Cog):
             if not self.current_reviewer:
                 await interaction.response.send_message("You must start reviewing before rejecting.", ephemeral=True)
                 return
-            await interaction.response.send_modal(self.cog.RejectModal(self.message, self.submitted_user, self.team_mention))
+            target_msg = self.message or interaction.message
+            await interaction.response.send_modal(
+                self.cog.RejectModal(self.cog, target_msg, self.submitted_user, self.team_mention)
+            )
 
     class RestrictedBossSelectView(ui.View):
         def __init__(self, cog: 'MonopolyCog', submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str, valid_bosses: list, current_tile: int):
