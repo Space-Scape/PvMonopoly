@@ -802,37 +802,55 @@ class MonopolyCog(commands.Cog):
             max_length=1000
         )
 
-        def __init__(self, review_message: discord.Message, submitter: discord.Member):
+        def __init__(self, review_message: discord.Message, submitter: discord.Member, team_mention: str = ""):
             super().__init__()
             self.review_message = review_message
             self.submitter = submitter
+            self.team_mention = team_mention
 
         async def on_submit(self, interaction: discord.Interaction):
             try:
-                log_chan = interaction.client.get_channel(int(LOG_CHANNEL))
-                if log_chan:
-                    await log_chan.send(
-                        f"❌ Drop submission rejected for {self.submitter.mention} by {interaction.user.mention}.\n"
-                        f"**Reason:** {self.reason.value}"
-                    )
-                else:
-                    print(f"❌ RejectModal: Log channel {LOG_CHANNEL} not found.")
+                await interaction.response.defer(ephemeral=True)
 
                 embed = self.review_message.embeds[0]
                 embed.color = discord.Color.red()
                 if "[Rejected]" not in embed.title:
                     embed.title += " [Rejected]"
+
+                status_field_index = next(
+                    (i for i, field in enumerate(embed.fields) if field.name in ("Review Status", "Reviewed By")),
+                    None
+                )
+                if status_field_index is not None:
+                    embed.set_field_at(status_field_index, name="Reviewed By", value=interaction.user.mention, inline=False)
+                else:
+                    embed.insert_field_at(0, name="Reviewed By", value=interaction.user.mention, inline=False)
+
                 existing_field = next((i for i, field in enumerate(embed.fields) if field.name == "Rejection Reason"), None)
                 if existing_field is not None:
                     embed.set_field_at(existing_field, name="Rejection Reason", value=self.reason.value, inline=False)
                 else:
                     embed.add_field(name="Rejection Reason", value=self.reason.value, inline=False)
 
-                await self.review_message.edit(embed=embed, view=None)
-                await interaction.response.send_message("✅ Rejection noted.", ephemeral=True)
+                await self.review_message.delete()
+
+                log_chan = interaction.client.get_channel(int(LOG_CHANNEL))
+                if log_chan:
+                    mention = f"{self.team_mention} " if self.team_mention else ""
+                    await log_chan.send(
+                        content=(
+                            f"❌ {mention}Drop submission rejected for {self.submitter.mention} by {interaction.user.mention}.\n"
+                            f"**Reason:** {self.reason.value}"
+                        ),
+                        embed=embed
+                    )
+                else:
+                    print(f"❌ RejectModal: Log channel {LOG_CHANNEL} not found.")
+
+                await interaction.followup.send("✅ Rejection noted and moved to the drop log.", ephemeral=True)
             except Exception as e:
                 print(f"❌ Error in RejectModal: {e}")
-                await interaction.response.send_message(f"Error processing rejection: {e}", ephemeral=True)
+                await interaction.followup.send(f"❌ Error processing rejection: {e}", ephemeral=True)
     
     class CardTargetView(discord.ui.View):
         def __init__(self, cog, user_team: str, valid_targets: list, card_name: str, card_action: str, extra_data: dict = None):
@@ -1376,7 +1394,7 @@ class MonopolyCog(commands.Cog):
             if not self.current_reviewer:
                 await interaction.response.send_message("You must start reviewing before rejecting.", ephemeral=True)
                 return
-            await interaction.response.send_modal(self.cog.RejectModal(self.message, self.submitted_user))
+            await interaction.response.send_modal(self.cog.RejectModal(self.message, self.submitted_user, self.team_mention))
 
     class RestrictedBossSelectView(ui.View):
         def __init__(self, cog: 'MonopolyCog', submitting_user: discord.Member, submitted_for: discord.Member, screenshot_url: str, valid_bosses: list, current_tile: int):
@@ -1635,7 +1653,7 @@ class MonopolyCog(commands.Cog):
         for team_name in TEAM_ROLES:
             team_chan = self.get_team_channel(team_name)
             if team_chan:
-                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** <a:fire:1559013496455168082> \n\nHere are your 3 starting cards:")
+                await team_chan.send(f"<a:fire:1559013496455168082> **The game has begun!** <a:fire:1559013496455168082> \n\nHere are your 3 starting items:")
                 for _ in range(3):
                     card_type = random.choice(["Chest", "Chance"])
                     await self.team_receives_card(team_name, card_type, team_chan)
