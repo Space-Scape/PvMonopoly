@@ -445,13 +445,15 @@ class MonopolyCog(commands.Cog):
             return description
 
     def _is_secret_game_log_message(self, content: Optional[str] = None, embed: Optional[discord.Embed] = None) -> bool:
-        """Messages that should stay private to team channels (activation/status/card-receive secrets)."""
+        """Filter out secret team messages and redundant intermediate/victim notifications from the public Game Log."""
         try:
             parts = []
+            title_lower = ""
             if content:
                 parts.append(str(content))
             if embed:
                 if embed.title:
+                    title_lower = str(embed.title).lower()
                     parts.append(str(embed.title))
                 if embed.description:
                     parts.append(str(embed.description))
@@ -460,6 +462,7 @@ class MonopolyCog(commands.Cog):
                     parts.append(str(getattr(field, 'value', '')))
             text_blob = ' '.join(parts).lower()
 
+            # 1. Secret card draws & passive draws
             secret_card_phrases = [
                 'drew a chance card', 'drew a chest card',
                 'received a chance card', 'received a chest card',
@@ -469,12 +472,30 @@ class MonopolyCog(commands.Cog):
             if any(phrase in text_blob for phrase in secret_card_phrases):
                 return True
 
-            secret_activation_phrases = [
-                'vengeance activated',
-                'redemption activated',
-                'elder maul activated'
+            # 2. Secret status activations (when first cast by captain)
+            if embed and embed.color == discord.Color.green() and "activated" in title_lower:
+                return True
+
+            # 3. Redundant Roll Grant notifications ("Your team landed a drop...", "Free Roll Granted!")
+            unneeded_roll_titles = [
+                'roll granted!',
+                'free roll granted!'
             ]
-            if any(phrase in text_blob for phrase in secret_activation_phrases):
+            if any(t in title_lower for t in unneeded_roll_titles):
+                return True
+
+            # 4. Redundant PvP victim notifications & intermediate caster block/recoil embeds
+            # (The final "Team X used Card!" summary embed already logs the full outcome to Game Log)
+            redundant_pvp_titles = [
+                'attack blocked!', 'spell blocked!', 'attack failed!',
+                'protect item activated!', 'redemption activated!', 'vengeance activated!',
+                'ring of stone activated!', 'recoil activated!', 'recoil shattered!',
+                'you were lured!', 'you were backstabbed!', 'you were hit by dragon spear!',
+                "you've been swapped!", 'you are teleblocked!', 'card stolen!',
+                'you were entangled!', 'pickpocketed!', 'card lost!',
+                "rogue's gloves failed", 'smite failed!'
+            ]
+            if any(t in title_lower for t in redundant_pvp_titles):
                 return True
 
             return False
@@ -1122,7 +1143,6 @@ class MonopolyCog(commands.Cog):
                                         owner_team_chan = self.cog.get_team_channel(owner_team)
                                         if owner_team_chan:
                                             await owner_team_chan.send(phoenix_msg)
-                                            await self.cog.mirror_to_game_log(owner_team_chan, content=phoenix_msg, team_name=owner_team)
                                     else:
                                         final_gp_value -= tax_amount
 
@@ -1172,7 +1192,6 @@ class MonopolyCog(commands.Cog):
                                             await self.cog.mirror_to_game_log(team_chan, content=tax_message, team_name=team_name)
                                         if owner_team_chan:
                                             await owner_team_chan.send(tax_message)
-                                            await self.cog.mirror_to_game_log(owner_team_chan, content=tax_message, team_name=owner_team)
                                         break
 
                         if is_gp_doubled:
@@ -3843,7 +3862,6 @@ class MonopolyCog(commands.Cog):
                 intended_pos = raw_new_pos % BOARD_SIZE
                 new_pos = self.resolve_nonroll_landing_tile(intended_pos)
 
-                # --- 💰 PASS GO CHECK ---
                 go_msg = ""
                 if raw_new_pos >= BOARD_SIZE and new_pos != 30:
                     go_msg = await self.process_manual_pass_go(team_name, team_row_idx, all_teams_data[team_row_idx-2])
@@ -3877,7 +3895,6 @@ class MonopolyCog(commands.Cog):
                         continue
                     
                     opponent_pos = int(record.get("Position", -1))
-                    
                     dist = (opponent_pos - caster_pos) % BOARD_SIZE
                     
                     if 1 <= dist <= 12:
@@ -3907,24 +3924,14 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Lure** on you, but your **Redemption** activated!", color=discord.Color.blue())
                         await victim_channel.send(embed=fizzle_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
                 
                 elif has_stone:
                     await self.consume_ring_of_stone(target_team)
                     embed_description = f"<:lure:1558986093796392960> **{team_name}** tried to use **Lure** on **{target_team}**...\n\n<:ring_of_stone:1558985677134241873> But **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be moved. The Lure failed!"
-                    
-                    stone_caster_embed = discord.Embed(
-                        title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
-                        description=f"You tried to Lure **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be moved!\nYour attack failed and your card was wasted.", 
-                        color=discord.Color.red()
-                    )
-                    await interaction.channel.send(embed=stone_caster_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                     if victim_channel:
                         stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to **Lure** you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                         await victim_channel.send(embed=stone_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                 
                 else:
                     intended_lure_pos = caster_pos
@@ -3946,33 +3953,21 @@ class MonopolyCog(commands.Cog):
                     embed_description += glider_note
                     
                     if victim_channel:
-                    
                         lure_embed = discord.Embed(
-                    
                             title="<:lure:1558986093796392960> You Were Lured!",
-                    
                             description=(f"**{team_name}** used **Lure** and pulled your team to the **{self.get_tile_name_for_display(final_lure_pos)}** tile (Tile **{final_lure_pos}**)." + glider_note_victim),
-                    
                             color=discord.Color.orange()
-                    
                         )
-                    
                         await victim_channel.send(embed=lure_embed)
-
-                    
-                        await self.mirror_to_game_log(victim_channel, embed=lure_embed)
-
                     
                     await self.check_and_award_card_on_land(target_team, final_lure_pos, "being lured to")
                     await self.auto_post_show_drops_if_boss_tile(target_team, final_lure_pos)
 
             elif card_name == "Escape Crystal":
-                # 1. Teleblock Check
                 if self.get_teleblock_status(team_name) == "yes":
                     await interaction.followup.send("<:teleblock:1558985901831364710> You are Teleblocked! You cannot use this card, even in jail!", ephemeral=True)
                     return 
 
-                # 2. Jail Status Check (The new guard clause)
                 jail_status = await asyncio.to_thread(self.get_jail_status, team_name)
                 if jail_status != "yes":
                     await interaction.followup.send(
@@ -3982,9 +3977,7 @@ class MonopolyCog(commands.Cog):
                     )
                     return
 
-                # 3. Execution
                 await asyncio.to_thread(self.increment_rolls_available, team_name)
-                # Clear
                 await asyncio.to_thread(self.set_jail_status, team_name, "no")
                 
                 embed_description = "> 🎲 You have used your crystal to escape! You gained a free roll."
@@ -4139,7 +4132,6 @@ class MonopolyCog(commands.Cog):
                         continue
                     
                     opponent_pos = int(record.get("Position", -1))
-                    
                     dist = (opponent_pos - caster_pos) % BOARD_SIZE
                     
                     if 1 <= dist <= 5:
@@ -4165,7 +4157,6 @@ class MonopolyCog(commands.Cog):
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
-                # 1. Check Redemption (Total Immunity)
                 if await asyncio.to_thread(self.check_and_consume_redemption, target_team):
                     embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated. **Backstab** fizzled.\n"
                     if victim_channel:
@@ -4175,26 +4166,15 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.blue()
                         )
                         await victim_channel.send(embed=fizzle_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
                 
                 elif has_stone:
                     await self.consume_ring_of_stone(target_team)
                     embed_description += f"> <:ring_of_stone:1558985677134241873> **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be moved. **Backstab** failed!\n"
-                    
-                    stone_caster_embed = discord.Embed(
-                        title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
-                        description=f"You tried to Backstab **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be moved!\nYour attack failed and your card was wasted.", 
-                        color=discord.Color.red()
-                    )
-                    await interaction.channel.send(embed=stone_caster_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                     if victim_channel:
                         stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to **Backstab** you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                         await victim_channel.send(embed=stone_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                 
-                # 2. Check Vengeance (Rebound)
                 elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
                     elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name) 
                     
@@ -4218,14 +4198,6 @@ class MonopolyCog(commands.Cog):
                     await self.check_and_award_card_on_land(team_name, new_pos, "being rebounded by Backstab to")
                     await self.auto_post_show_drops_if_boss_tile(team_name, new_pos)
                     
-                    skull_embed = discord.Embed(
-                        title="<:venge:1558986464409297077> Vengeance Activated!", 
-                        description=(f"You activated **{target_team}**'s Vengeance!\nYour team was dragged **{final_roll_val}** tiles behind them to the **{destination_tile_name}** tile (Tile **{new_pos}**)!" + glider_note_victim), 
-                        color=discord.Color.dark_red()
-                    )
-                    await interaction.channel.send(embed=skull_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
-                    
                     if victim_channel:
                         victim_embed = discord.Embed(
                             title="<:venge:1558986464409297077> Vengeance Activated!",
@@ -4237,9 +4209,7 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.dark_red()
                         )
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                 
-                # 3. Normal Hit
                 else:
                     elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
                     
@@ -4275,7 +4245,6 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.dark_red()
                         )
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             elif card_name == "Dragon Spear" and isinstance(team_wildcard_value, int):
                 stored_roll = team_wildcard_value
@@ -4314,11 +4283,9 @@ class MonopolyCog(commands.Cog):
                 for target_team, target_pos in targets:
                     victim_channel = self.get_team_channel(target_team)
                     
-                    # --- PASSIVE CHECKS ---
                     victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                     has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
-                    # 1. Check Redemption (Total Immunity)
                     if await asyncio.to_thread(self.check_and_consume_redemption, target_team):
                         embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated. **Dragon Spear** fizzled.\n"
                         if victim_channel:
@@ -4328,28 +4295,17 @@ class MonopolyCog(commands.Cog):
                                 color=discord.Color.blue()
                             )
                             await victim_channel.send(embed=fizzle_embed)
-                            await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
                         continue  
                     
                     elif has_stone:
                         await self.consume_ring_of_stone(target_team)
                         embed_description += f"> <:ring_of_stone:1558985677134241873> **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be speared.\n"
-                        
-                        stone_caster_embed = discord.Embed(
-                            title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
-                            description=f"You tried to Dragon Spear **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be moved!", 
-                            color=discord.Color.red()
-                        )
-                        await interaction.channel.send(embed=stone_caster_embed)
-                        await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                         if victim_channel:
                             stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to use a **Dragon Spear** on you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                             await victim_channel.send(embed=stone_embed)
-                            await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                         continue 
 
-                    # 2. Check Vengeance (Rebound)
                     elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
                         elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, team_name) 
                         
@@ -4374,14 +4330,6 @@ class MonopolyCog(commands.Cog):
                         await self.check_and_award_card_on_land(team_name, new_pos, "being rebounded by Dragon Spear to")
                         await self.auto_post_show_drops_if_boss_tile(team_name, new_pos)
                         
-                        skull_embed = discord.Embed(
-                            title="<:venge:1558986464409297077> Vengeance Activated!", 
-                            description=(f"You activated **{target_team}**'s Vengeance!\nYour team moved back **{abs(final_move_amount)}** spaces to the **{destination_tile_name}** tile (Tile **{new_pos}**)!" + glider_note_victim), 
-                            color=discord.Color.dark_red()
-                        )
-                        await interaction.channel.send(embed=skull_embed)
-                        await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
-                        
                         if victim_channel:
                             victim_embed = discord.Embed(
                                 title="<:venge:1558986464409297077> Vengeance Activated!",
@@ -4393,10 +4341,8 @@ class MonopolyCog(commands.Cog):
                                 color=discord.Color.dark_red()
                             )
                             await victim_channel.send(embed=victim_embed)
-                            await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                         continue  
                     
-                    # 3. Normal Hit
                     else:
                         elder_maul_active = await asyncio.to_thread(self.check_and_consume_elder_maul, target_team)
                         
@@ -4428,10 +4374,8 @@ class MonopolyCog(commands.Cog):
                                 color=discord.Color.dark_red()
                             )
                             await victim_channel.send(embed=victim_embed)
-                            await self.mirror_to_game_log(victim_channel, embed=victim_embed)
             
             elif card_name == "Varrock Tele":
-                # Check Teleblock
                 if await asyncio.to_thread(self.get_teleblock_status, team_name) == "yes":
                     await interaction.followup.send("<:teleblock:1558985901831364710> You are Teleblocked! You cannot use this card.", ephemeral=True)
                     return 
@@ -4470,7 +4414,6 @@ class MonopolyCog(commands.Cog):
                     return 
 
                 caster_pos = int(team_info.get("Position", -1))
-
                 target_tile_data = next((h for h in house_data if int(h.get("Tile", -1)) == caster_pos), None)
 
                 if not target_tile_data:
@@ -4533,7 +4476,6 @@ class MonopolyCog(commands.Cog):
 
                 for house in houses:
                     house_tile = int(house.get("tile", 0))
-                    
                     distance = (house_tile - caster_pos) % BOARD_SIZE
                     
                     if 0 < distance <= 10:
@@ -4551,7 +4493,6 @@ class MonopolyCog(commands.Cog):
                 intended_pos = closest_house_pos
                 new_pos = self.resolve_nonroll_landing_tile(intended_pos)
 
-                # --- 💰 PASS GO CHECK ---
                 go_msg = ""
                 if passed_go_on_tele and new_pos != 30:
                     go_msg = await self.process_manual_pass_go(team_name, team_row_idx, all_teams_data[team_row_idx-2])
@@ -4592,7 +4533,6 @@ class MonopolyCog(commands.Cog):
                         continue
                     
                     opponent_pos = int(record.get("Position", -1))
-                    
                     dist = abs(opponent_pos - caster_pos)
                     shortest_dist = min(dist, BOARD_SIZE - dist)
                     
@@ -4615,7 +4555,6 @@ class MonopolyCog(commands.Cog):
                 victim_channel = self.get_team_channel(target_team)
                 embed_description = ""
 
-                # --- PASSIVE CHECKS ---
                 victim_info = next((r for r in all_teams_data if r.get("Team") == target_team), {})
                 has_stone = str(victim_info.get("Ring of Stone", "no")).strip().lower() == "yes"
 
@@ -4624,31 +4563,20 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Tele Other** on your team, but your **Vengeance** caused the teleport to fizzle.", color=discord.Color.dark_red())
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                 
                 elif self.check_and_consume_redemption(target_team):
                     embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated! The teleport was cancelled."
                     if victim_channel:
                         fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Redemption** activated!", color=discord.Color.blue())
                         await victim_channel.send(embed=fizzle_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
                 
                 elif has_stone:
                     await self.consume_ring_of_stone(target_team)
                     embed_description += f"> <:ring_of_stone:1558985677134241873> **{target_team}** was wearing a **Ring of Stone**! They turned into a heavy rock and could not be teleported. The spell failed!"
-                    
-                    stone_caster_embed = discord.Embed(
-                        title="<:ring_of_stone:1558985677134241873> Attack Blocked!", 
-                        description=f"You tried to Tele Other **{target_team}**, but they were wearing a **Ring of Stone** and couldn't be teleported!\nYour attack failed and your card was wasted.", 
-                        color=discord.Color.red()
-                    )
-                    await interaction.channel.send(embed=stone_caster_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                     if victim_channel:
                         stone_embed = discord.Embed(title="<:ring_of_stone:1558985677134241873> Ring of Stone Activated!", description=f"**{team_name}** tried to use **Tele Other** on you, but your **Ring of Stone** turned you into a rock and prevented you from being moved!", color=discord.Color.blue())
                         await victim_channel.send(embed=stone_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=stone_embed)
                 
                 else:
                     caster_intended_pos = target_pos
@@ -4675,7 +4603,6 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         swap_embed = discord.Embed(title="<:teleother:1558985957561213000> You've Been Swapped!", description=(f"**{team_name}** used **Tele Other** and swapped places with your team!\nYour team is now on the **{target_dest_name}** tile (Tile **{target_final_pos}**)." + target_glider_note_victim), color=discord.Color.orange())
                         await victim_channel.send(embed=swap_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=swap_embed)
 
                     await self.check_and_award_card_on_land(team_name, caster_final_pos, "being teleported to")
                     await self.check_and_award_card_on_land(target_team, target_final_pos, "being teleported to")
@@ -4702,7 +4629,7 @@ class MonopolyCog(commands.Cog):
                 
                 embed = discord.Embed(
                     title=f"{card_emoji} {team_name} used {card_name}!",
-                    description=embed_description,
+                    description=f"{embed_description}{double_card_note}",
                     color=discord.Color.blue()
                 )
                 await interaction.followup.send(embed=embed, ephemeral=False)
@@ -4729,8 +4656,6 @@ class MonopolyCog(commands.Cog):
         card_emoji = CARD_EMOJIS.get(card_name, "<:card:1559795580656689222>")
         embed_color = discord.Color.blue()
         double_card_note = extra_data.get("double_card_note", "")
-        
-        loop = asyncio.get_event_loop()
 
         if action == "tele_block":
             embed_color = discord.Color.dark_purple()
@@ -4739,18 +4664,13 @@ class MonopolyCog(commands.Cog):
                 if victim_channel:
                     fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Tele Block** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
                 embed_description += f"> <:venge:1558986464409297077> **{target_team}** had Vengeance! The effect rebounded, and your team is now **Teleblocked**."
                 await asyncio.to_thread(self.set_teleblock_status, team_name, "yes") 
-                skull_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"You activated **{target_team}**'s Vengeance!\nYour team is now **Teleblocked**!", color=discord.Color.dark_red())
-                await interaction.channel.send(embed=skull_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=skull_embed) 
                 if victim_channel:
                     victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Tele Block** on your team, but your **Vengeance** rebounded the effect and **Teleblocked** them instead!", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             else:
                 embed_description += f"> <:teleblock:1558985901831364710> **{target_team}** is now **Teleblocked** until after their next roll."
@@ -4758,7 +4678,6 @@ class MonopolyCog(commands.Cog):
                 if victim_channel:
                     tb_embed = discord.Embed(title="<:teleblock:1558985901831364710> You are Teleblocked!", description=f"**{team_name}** used **Tele Block** on your team! You cannot use teleport cards until after your next roll.", color=discord.Color.dark_purple())
                     await victim_channel.send(embed=tb_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=tb_embed)
 
         elif action == "rogues_gloves":
             embed_color = discord.Color.dark_gray()
@@ -4775,7 +4694,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=fail_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 return
 
             # --- PASSIVE CHECKS ---
@@ -4787,14 +4705,6 @@ class MonopolyCog(commands.Cog):
             if has_protect:
                 await self.consume_protect_item(victim_team)
                 embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:protect_item:1559003530050670632> But **{victim_team}**'s Protect Item prayer activated! The steal was blocked."
-                
-                protect_caster_embed = discord.Embed(
-                    title="<:protect_item:1559003530050670632> Attack Blocked!", 
-                    description=f"You tried to use Rogue's Gloves on **{victim_team}**, but their **Protect Item** prayer was active!\nYour attack failed and your card was wasted.", 
-                    color=discord.Color.red()
-                )
-                await interaction.channel.send(embed=protect_caster_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=protect_caster_embed)
 
                 if victim_channel:
                     protect_embed = discord.Embed(
@@ -4803,7 +4713,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=protect_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=protect_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_redemption, victim_team):
                 embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:redemption:1558985458195898389> But **{victim_team}**'s Redemption activated!"
@@ -4814,7 +4723,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=fizzle_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_vengeance, victim_team):
                 embed_description = f"<:roguegloves:1558986623486660648> **{team_name}** tried to use **Rogue's Gloves** on **{victim_team}**...\n\n<:venge:1558986464409297077> **{victim_team}** had Vengeance! The effect was rebounded!\n"
@@ -4879,14 +4787,9 @@ class MonopolyCog(commands.Cog):
 
                     embed_description += f"<:roguegloves:1558986623486660648> The steal rebounded! **{victim_team}** stole the **Rogue's Gloves** card from **{team_name}**!"
 
-                skull_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nThey stole your **{stolen_from_caster_name}** card!", color=discord.Color.dark_red())
-                await interaction.channel.send(embed=skull_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
-
                 if victim_channel:
                     victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Rogue's Gloves** on you, but your **Vengeance** rebounded the effect!\nYou stole **{stolen_from_caster_name}** from their team.", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                 
             elif has_recoil:
                 caster_chest = self.get_held_cards(self.chest_sheet, team_name)
@@ -4907,7 +4810,6 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         fail_embed = discord.Embed(title="<:defence:1559009393884925952> Attack Failed!", description=f"**{team_name}** tried to steal from you, but the attack failed due to a lack of cards for the **Ring of Recoil** penalty.", color=discord.Color.blue())
                         await victim_channel.send(embed=fail_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 else:
                     await self.consume_recoil(victim_team)
                     
@@ -4929,14 +4831,6 @@ class MonopolyCog(commands.Cog):
                     except: pass
 
                     embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** **{team_name}** tried to steal, but the ring blocked it and forced them to give up a card! **{victim_team}** got **{stolen_from_caster['name']}**!"
-                    
-                    recoil_caster_embed = discord.Embed(
-                        title="<:recoil:1558985588055609374> Recoil Activated!", 
-                        description=f"You attacked a team wearing a **Ring of Recoil**!\nYour steal was blocked, and the recoil forced you to give them a card!\n\n🔴 You lost **{stolen_from_caster['name']}**.", 
-                        color=discord.Color.dark_red()
-                    )
-                    await interaction.channel.send(embed=recoil_caster_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=recoil_caster_embed)
 
                     if victim_channel:
                         victim_embed = discord.Embed(
@@ -4945,7 +4839,6 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.green()
                         )
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             else:
                 stolen_card = random.choice(target_cards)
@@ -4975,7 +4868,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.dark_red()
                     )
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
         
         elif action == "entangle":
             embed_color = discord.Color.dark_green()
@@ -5003,19 +4895,11 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=fizzle_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             # 2. Ring of Stone
             elif has_stone:
                 await self.consume_ring_of_stone(victim_team)
                 embed_description += f"> <:ring_of_stone:1558985677134241873> **{victim_team}** was wearing a **Ring of Stone**! Their solid form broke free of the roots!"
-                stone_caster_embed = discord.Embed(
-                    title="<:ring_of_stone:1558985677134241873> Spell Blocked!",
-                    description=f"You tried to Entangle **{victim_team}**, but their **Ring of Stone** absorbed the snare!",
-                    color=discord.Color.red()
-                )
-                await interaction.channel.send(embed=stone_caster_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=stone_caster_embed)
 
                 if victim_channel:
                     stone_embed = discord.Embed(
@@ -5024,21 +4908,12 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=stone_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=stone_embed)
 
             # 3. Vengeance
             elif await asyncio.to_thread(self.check_and_consume_vengeance, victim_team):
                 if c_row_idx != -1:
                     await asyncio.to_thread(self.team_data_sheet.update_cell, c_row_idx, rp_col_idx, "2")
                 embed_description += f"> <:venge:1558986464409297077> **{victim_team}** had Vengeance! The roots rebounded, inflicting a **-2 roll penalty** on **{team_name}**!"
-                
-                skull_embed = discord.Embed(
-                    title="<:venge:1558986464409297077> Vengeance Activated!",
-                    description=f"You activated **{victim_team}**'s Vengeance!\nYour team has been entangled (-2 to next roll)!",
-                    color=discord.Color.dark_red()
-                )
-                await interaction.channel.send(embed=skull_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
 
                 if victim_channel:
                     victim_embed = discord.Embed(
@@ -5047,7 +4922,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.dark_red()
                     )
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             # 4. Ring of Recoil
             elif has_recoil:
@@ -5058,14 +4932,6 @@ class MonopolyCog(commands.Cog):
                     await asyncio.to_thread(self.team_data_sheet.update_cell, c_row_idx, rp_col_idx, "2")
                 embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** Both **{team_name}** and **{victim_team}** are entangled (-2 to their next rolls)!"
 
-                recoil_caster_embed = discord.Embed(
-                    title="<:recoil:1558985588055609374> Recoil Activated!",
-                    description=f"**{victim_team}** wore a **Ring of Recoil**! The vines snapped back, entangling both teams (-2 to next roll)!",
-                    color=discord.Color.dark_red()
-                )
-                await interaction.channel.send(embed=recoil_caster_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=recoil_caster_embed)
-
                 if victim_channel:
                     victim_embed = discord.Embed(
                         title="<:recoil:1558985588055609374> Recoil Shattered!",
@@ -5073,7 +4939,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.green()
                     )
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             # 5. Normal Hit
             else:
@@ -5092,7 +4957,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.dark_green()
                     )
                     await victim_channel.send(embed=entangle_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=entangle_embed)
 
         elif action == "pickpocket":
             embed_color = discord.Color.dark_gold()
@@ -5116,14 +4980,6 @@ class MonopolyCog(commands.Cog):
             if has_protect:
                 await self.consume_protect_item(target_team)
                 embed_description += f"> <:protect_item:1559003530050670632> **{target_team}**'s Protect Item prayer activated! The Pickpocket was blocked."
-                
-                protect_caster_embed = discord.Embed(
-                    title="<:protect_item:1559003530050670632> Attack Blocked!", 
-                    description=f"You tried to Pickpocket **{target_team}**, but their **Protect Item** prayer was active!\nYour attack failed and your card was wasted.", 
-                    color=discord.Color.red()
-                )
-                await interaction.channel.send(embed=protect_caster_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=protect_caster_embed)
 
                 if victim_channel:
                     protect_embed = discord.Embed(
@@ -5132,14 +4988,12 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=protect_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=protect_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_redemption, target_team):
                 embed_description += f"> <:redemption:1558985458195898389> **{target_team}**'s Redemption activated! The Pickpocket fizzled."
                 if victim_channel:
                     fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_vengeance, target_team):
                 base_percent = 0.20
@@ -5158,7 +5012,6 @@ class MonopolyCog(commands.Cog):
                 if victim_channel:
                     victim_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Vengeance** rebounded it! You stole **{steal_amount:,} GP** from them!{maul_note}", color=discord.Color.green())
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             elif has_recoil:
                 base_percent = 0.20
@@ -5172,7 +5025,6 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         fail_embed = discord.Embed(title="<:defence:1559009393884925952> Attack Failed!", description=f"**{team_name}** tried to Pickpocket you, but couldn't survive your **Ring of Recoil**!", color=discord.Color.blue())
                         await victim_channel.send(embed=fail_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 else:
                     await self.consume_recoil(target_team)
                     new_target_gp = max(0, highest_gp - steal_amount)
@@ -5183,18 +5035,9 @@ class MonopolyCog(commands.Cog):
 
                     embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** Both **{team_name}** and **{target_team}** lost **{steal_amount:,} GP**!{maul_note}"
 
-                    recoil_caster_embed = discord.Embed(
-                        title="<:recoil:1558985588055609374> Recoil Activated!", 
-                        description=f"You attacked a team wearing a **Ring of Recoil**!\nBoth your team and **{target_team}** lost **{steal_amount:,} GP**!{maul_note}", 
-                        color=discord.Color.dark_red()
-                    )
-                    await interaction.channel.send(embed=recoil_caster_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=recoil_caster_embed)
-
                     if victim_channel:
                         victim_embed = discord.Embed(title="<:recoil:1558985588055609374> Recoil Activated!", description=f"**{team_name}** tried to use **Pickpocket** on you, but your **Ring of Recoil** triggered! Both teams lost **{steal_amount:,} GP**!{maul_note}", color=discord.Color.green())
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             else:
                 base_percent = 0.20
@@ -5218,7 +5061,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.dark_red() if not maul_active else discord.Color.blue()
                     )
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
         elif action == "smite":
             embed_color = discord.Color.red()
@@ -5238,7 +5080,6 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=fail_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 return  
 
             # --- PASSIVE CHECKS ---
@@ -5250,14 +5091,6 @@ class MonopolyCog(commands.Cog):
             if has_protect:
                 await self.consume_protect_item(victim_team)
                 embed_description += f"> <:protect_item:1559003530050670632> **{victim_team}**'s Protect Item prayer activated! The Smite was blocked."
-                
-                protect_caster_embed = discord.Embed(
-                    title="<:protect_item:1559003530050670632> Attack Blocked!", 
-                    description=f"You tried to Smite **{victim_team}**, but their **Protect Item** prayer was active!\nYour attack failed and your card was wasted.", 
-                    color=discord.Color.red()
-                )
-                await interaction.channel.send(embed=protect_caster_embed)
-                await self.mirror_to_game_log(interaction.channel, embed=protect_caster_embed)
 
                 if victim_channel:
                     protect_embed = discord.Embed(
@@ -5266,14 +5099,12 @@ class MonopolyCog(commands.Cog):
                         color=discord.Color.blue()
                     )
                     await victim_channel.send(embed=protect_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=protect_embed)
 
             elif await asyncio.to_thread(self.check_and_consume_redemption, victim_team):
                 embed_description += f"> <:redemption:1558985458195898389> **{victim_team}**'s Redemption activated!"
                 if victim_channel:
                     fizzle_embed = discord.Embed(title="<:redemption:1558985458195898389> Redemption Activated!", description=f"**{team_name}** tried to use **Smite** on you, but your **Redemption** activated!", color=discord.Color.blue())
                     await victim_channel.send(embed=fizzle_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=fizzle_embed)
             
             elif await asyncio.to_thread(self.check_and_consume_vengeance, victim_team):
                 embed_description += f"> <:venge:1558986464409297077> **{victim_team}** had Vengeance! The effect rebounded.\n> "
@@ -5292,7 +5123,6 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.dark_red()
                         )
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                 else:
                     card_to_remove = random.choice(non_active_caster_cards)
                     remove_sheet = self.chest_sheet if card_to_remove in caster_chest_cards else self.chance_sheet
@@ -5312,10 +5142,6 @@ class MonopolyCog(commands.Cog):
                     
                     embed_description += f"**{team_name}** lost their **{card_to_remove['name']}** card."
                     
-                    skull_embed = discord.Embed(title="<:venge:1558986464409297077> Vengeance Activated!", description=f"You activated **{victim_team}**'s Vengeance!\nYou lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
-                    await interaction.channel.send(embed=skull_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=skull_embed)
-                    
                     if victim_channel:
                         victim_embed = discord.Embed(
                             title="<:venge:1558986464409297077> Vengeance Activated!",
@@ -5323,7 +5149,6 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.dark_red()
                         )
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             elif has_recoil:
                 caster_chest = self.get_held_cards(self.chest_sheet, team_name)
@@ -5344,7 +5169,6 @@ class MonopolyCog(commands.Cog):
                     if victim_channel:
                         fail_embed = discord.Embed(title="<:defence:1559009393884925952> Attack Failed!", description=f"**{team_name}** tried to Smite you, but the attack failed due to a lack of cards for the **Ring of Recoil** swap.", color=discord.Color.blue())
                         await victim_channel.send(embed=fail_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=fail_embed)
                 else:
                     await self.consume_recoil(victim_team)
                     
@@ -5381,14 +5205,6 @@ class MonopolyCog(commands.Cog):
                     c_sheet.update_cell(c_row, 3, ", ".join(c_teams))
 
                     embed_description += f"> <:recoil:1558985588055609374> **Recoil Triggered!** Both **{team_name}** and **{victim_team}** lost a card! (**{caster_card['name']}** and **{target_card['name']}**)"
-                    
-                    recoil_caster_embed = discord.Embed(
-                        title="<:recoil:1558985588055609374> Recoil Activated!", 
-                        description=f"You attacked a team wearing a **Ring of Recoil**!\nBoth your team and **{victim_team}** lost a card!\n\n🔴 You lost **{caster_card['name']}**.\n🟢 They lost **{target_card['name']}**.", 
-                        color=discord.Color.dark_red()
-                    )
-                    await interaction.channel.send(embed=recoil_caster_embed)
-                    await self.mirror_to_game_log(interaction.channel, embed=recoil_caster_embed)
 
                     if victim_channel:
                         victim_embed = discord.Embed(
@@ -5397,7 +5213,6 @@ class MonopolyCog(commands.Cog):
                             color=discord.Color.green()
                         )
                         await victim_channel.send(embed=victim_embed)
-                        await self.mirror_to_game_log(victim_channel, embed=victim_embed)
 
             else:
                 card_to_remove = random.choice(non_active_cards)
@@ -5421,7 +5236,6 @@ class MonopolyCog(commands.Cog):
                 if victim_channel:
                     victim_embed = discord.Embed(title="<:sad:1559798386792865896> Card Lost!", description=f"**{team_name}** used **Smite**! Your team lost your **{card_to_remove['name']}** card!", color=discord.Color.dark_red())
                     await victim_channel.send(embed=victim_embed)
-                    await self.mirror_to_game_log(victim_channel, embed=victim_embed)
                         
         card_sheet = extra_data.get("card_sheet")
         card_row = extra_data.get("card_row")
